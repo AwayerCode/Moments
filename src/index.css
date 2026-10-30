@@ -1,468 +1,636 @@
 :root {
-  --blossom: #f7c4d2;
-  --blossom-deep: #f3a8bc;
-  --blossom-ink: #ff8fb0;
-  --title-pink: #ffb3c6;
-  --sky-top: #8ec8ff;
-  --sky-mid: #c7e6ff;
-  --sky-bottom: #fff4f8;
-  --fridge: #fbfbfb;
-  --caption: #2b2b2b;
-  --peach-pin: #f6c3b4;
-  color-scheme: light;
+  font-family:'Noto Sans SC',sans-serif;
+  color:#5b514e;
+  background:#eee8e1;
+  color-scheme:light;
+  font-synthesis:none;
 }
 
 * {
-  box-sizing: border-box;
+  box-sizing:border-box;
 }
 
-html,
-body,
-#root {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+html,body,#root {
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
 }
 
-body {
-  font-family: "Noto Sans SC", "Fredoka", system-ui, sans-serif;
-  background: var(--sky-bottom);
+button,input {
+  font:inherit;
 }
 
-button,
-input {
-  font: inherit;
+button {
+  -webkit-tap-highlight-color:transparent;
 }
 
-/* ---------- Entry / sky ---------- */
+button:focus-visible {
+  outline:3px solid #d98191;
+  outline-offset:5px;
+}
 
+/* The entrance is a small toy floating in a sunlit sky. */
 .sky-page {
-  position: relative;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 7vh 16px 24px;
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, #fff7 0%, transparent 55%),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-bottom) 100%);
+  height:100svh;
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  background:radial-gradient(ellipse at 95% 0%,#fff7d9 0%,transparent 32%),linear-gradient(155deg,#5ca7dc 0%,#a7d2ed 42%,#efd8dc 78%,#ffe7df 100%);
+}
+
+.sky-page:before {
+  content:'';
+  position:absolute;
+  inset:-20%;
+  z-index:-1;
+  background:conic-gradient(from 180deg at 85% 0%,transparent 0deg,#fff8 9deg,transparent 17deg,#fff6 22deg,transparent 30deg);
+  filter:blur(12px);
+  pointer-events:none;
 }
 
 .sky-glow {
-  position: absolute;
-  inset: 0 auto auto 50%;
-  width: 280px;
-  height: 280px;
-  transform: translateX(-50%);
-  background: radial-gradient(circle, #fff 0%, #fff0 68%);
-  pointer-events: none;
+  position:absolute;
+  width:70vw;
+  height:22vh;
+  bottom:0;
+  left:15vw;
+  background:#fff2e5;
+  filter:blur(55px);
+  border-radius:50%;
+  z-index:-1;
 }
 
 .clouds {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
 }
 
 .cloud {
-  position: absolute;
-  background: #fff;
-  border-radius: 999px;
-  filter: blur(0.2px);
-  opacity: 0.92;
+  position:absolute;
+  width:260px;
+  height:110px;
+  border-radius:50%;
+  background:radial-gradient(ellipse at 50% 20%,#fff9ed,#f6d9df 65%,#eac8d600);
+  filter:blur(9px);
+  box-shadow:0 -25px 25px #fff4e999;
 }
 
-.cloud::before,
-.cloud::after {
-  content: "";
-  position: absolute;
-  background: #fff;
-  border-radius: 999px;
+.cloud:before,.cloud:after {
+  content:'';
+  position:absolute;
+  border-radius:50%;
+  background:inherit;
+  width:60%;
+  height:150%;
+  bottom:10%;
+  left:5%;
 }
 
-.cloud.c1 {
-  width: 160px;
-  height: 42px;
-  top: 18%;
-  left: 8%;
-}
-.cloud.c1::before {
-  width: 70px;
-  height: 70px;
-  left: 18px;
-  top: -38px;
-}
-.cloud.c1::after {
-  width: 56px;
-  height: 56px;
-  right: 16px;
-  top: -24px;
+.cloud:after {
+  left:42%;
+  height:120%;
 }
 
-.cloud.c2 {
-  width: 120px;
-  height: 34px;
-  top: 12%;
-  right: 10%;
-}
-.cloud.c2::before {
-  width: 50px;
-  height: 50px;
-  left: 16px;
-  top: -28px;
+.c1 {
+  left:-110px;
+  top:30%;
+  transform:rotate(-10deg);
 }
 
-.cloud.c3 {
-  width: 180px;
-  height: 46px;
-  bottom: 16%;
-  left: 6%;
-  opacity: 0.8;
-}
-.cloud.c3::before {
-  width: 80px;
-  height: 80px;
-  left: 24px;
-  top: -42px;
+.c2 {
+  right:-130px;
+  top:42%;
+  transform:scale(1.4);
 }
 
-.cloud.c4 {
-  width: 140px;
-  height: 38px;
-  bottom: 22%;
-  right: 8%;
-  opacity: 0.75;
+.c3 {
+  left:-60px;
+  bottom:0;
+  transform:scale(2);
 }
-.cloud.c4::before {
-  width: 60px;
-  height: 60px;
-  right: 18px;
-  top: -32px;
+
+.c4 {
+  right:-80px;
+  bottom:-20px;
+  transform:scale(2);
 }
 
 .brand-title {
-  position: relative;
-  z-index: 2;
-  margin: 0 0 4vh;
-  font-family: "Fredoka", "Noto Sans SC", sans-serif;
-  font-weight: 700;
-  font-size: clamp(42px, 10vw, 72px);
-  letter-spacing: 0.02em;
-  color: var(--title-pink);
-  -webkit-text-stroke: 8px #fff;
-  paint-order: stroke fill;
-  text-shadow:
-    0 3px 0 #ffe0ea,
-    0 8px 0 #ffd0de,
-    0 14px 24px rgba(255, 150, 180, 0.28);
+  position:relative;
+  z-index:2;
+  flex:none;
+  margin:0 0 6px;
+  font-family:'Fredoka',sans-serif;
+  font-size:clamp(40px,7.7vw,78px);
+  font-weight:700;
+  letter-spacing:-.035em;
+  color:#f38f9c;
+  -webkit-text-stroke:10px #fff4ed;
+  paint-order:stroke fill;
+  text-shadow:0 3px 0 #d76d80,0 7px 0 #fff4ed,0 11px 12px #6f6f7850;
+  transform:rotate(-3deg);
 }
 
 .camera-stage {
-  position: relative;
-  z-index: 2;
-  width: min(420px, 92vw);
-  height: min(560px, 62svh);
+  position:relative;
+  width:min(560px,96vw);
+  height:min(620px,72svh);
+  flex:none;
+  filter:drop-shadow(0 22px 15px #9e6e7b26);
 }
 
 .instax-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
+  display:block;
+  width:100%;
+  height:100%;
 }
 
 .film-card-overlay {
-  position: absolute;
-  left: 0;
-  top: 0;
-  margin: 0;
-  padding: 18% 12% 10%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 8px;
-  background: transparent;
-  opacity: 0;
-  pointer-events: none;
+  position:absolute;
+  margin:0;
+  padding:16px 14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:8px;
+  opacity:0;
+  pointer-events:none;
 }
 
 .film-card-overlay.ready {
-  pointer-events: auto;
-}
-
-.film-card-overlay.shake {
-  animation: shake 0.42s ease;
-}
-
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  25% {
-    transform: translateX(-6px);
-  }
-  75% {
-    transform: translateX(6px);
-  }
+  pointer-events:auto;
 }
 
 .name-label {
-  font-size: 13px;
-  color: #6b6b6b;
-  padding-left: 10px;
+  text-align:center;
+  font-size:clamp(13px,2.4vw,18px);
+  font-weight:600;
+  letter-spacing:.15em;
+  color:#fff5ed;
+  text-shadow:0 2px 2px #a66a6b88;
 }
 
 .name-input {
-  height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: #f7e4ea;
-  padding: 0 14px;
-  color: #444;
-  outline: none;
-  caret-color: #888;
+  width:100%;
+  min-width:0;
+  height:40px;
+  flex-shrink:0;
+  border:2px solid #c0cbdd;
+  border-radius:30px;
+  background:#fff8f0;
+  padding:0 12px;
+  color:#675755;
+  outline:none;
+  box-shadow:inset 0 2px 4px #bd9b9b18;
+  transition:box-shadow .2s;
 }
 
 .name-input:focus {
-  box-shadow: 0 0 0 3px #ffd0dc;
+  box-shadow:0 0 0 3px #d8e4f080,inset 0 2px 4px #bd9b9b18;
 }
 
 .entry-error {
-  position: relative;
-  z-index: 2;
-  min-height: 1.4em;
-  margin: 18px 0 0;
-  color: #d25b7a;
-  font-size: 14px;
-  opacity: 0;
+  position:absolute;
+  bottom:12px;
+  left:16px;
+  right:16px;
+  text-align:center;
+  color:#a13d60;
+  font-size:13px;
+  opacity:0;
+  margin:0;
 }
 
 .entry-error.visible {
-  opacity: 1;
+  opacity:1;
 }
 
-/* ---------- Fridge wall ---------- */
+.film-card-overlay.fallback {
+  inset:20% 10% auto;
+  width:80%;
+  height:180px;
+  background:#efaaa9;
+  opacity:1;
+  border:12px solid #fff4ea;
+  border-radius:8px;
+}
 
-.fridge-page,
+.shake {
+  animation:shake .4s ease;
+}
+
+@keyframes shake {
+  25%,75% {
+    transform:translateX(-5px);
+  }
+  50% {
+    transform:translateX(5px);
+  }
+}
+
+/* Enamel, paper and small peach magnets. */
+.fridge-page,.fridge-viewport {
+  width:100%;
+  height:100svh;
+  overflow:hidden;
+  touch-action:none;
+  background:radial-gradient(ellipse at 25% 15%,#fcf8ef,#e3d9cf 80%);
+}
+
 .fridge-viewport {
-  width: 100%;
-  height: 100svh;
-  background: #f3f3f3;
-  touch-action: none;
-  overflow: hidden;
+  cursor:grab;
+}
+
+.fridge-viewport:active {
+  cursor:grabbing;
 }
 
 .fridge-world {
-  transform-origin: 0 0;
-  will-change: transform;
+  transform-origin:0 0;
+  will-change:transform;
 }
 
 .fridge-door {
-  position: relative;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%);
-  box-shadow:
-    inset 0 0 0 1px #f0f0f0,
-    18px 0 40px rgba(0, 0, 0, 0.04);
-  border-right: 1px solid #ececec;
+  position:relative;
+  border-radius:38px 38px 26px 26px;
+  background:linear-gradient(94deg,#cec3b5 0%,#faf5eb 2%,#eee6dd 4%,#f5efe7 30%,#eee5dc 92%,#d6ccbf 98%,#a99d8e 100%);
+  box-shadow:inset 4px 0 3px #fff9, inset -7px 0 8px #746a5755,0 20px 12px -12px #403a31,0 30px 0 -12px #aaa092,0 33px 0 -12px #fff5e9,24px 18px 50px #74645133;
+  border:1px solid #cfc6b9;
 }
 
-.fridge-handle {
-  position: absolute;
-  right: 18px;
-  top: 18%;
-  width: 14px;
-  height: 42%;
-  border-radius: 10px;
-  background: linear-gradient(90deg, #f2f2f2, #fff);
-  box-shadow:
-    inset 1px 0 0 #fff,
-    -2px 0 6px rgba(0, 0, 0, 0.06);
+.fridge-door:before {
+  content:'';
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(120deg,transparent 12%,#fff8 16%,transparent 23%,transparent 38%,#ad9d8b12 40%,transparent 49%);
+  box-shadow:inset 0 3px 4px #fff9;
+}
+
+.fridge-door:after {
+  content:'';
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-110px;
+  height:92px;
+  border-radius:14px 14px 30px 30px;
+  background:linear-gradient(90deg,#ded4c7,#f2eae0 5%,#e7ddd1 95%,#b1a594);
+  box-shadow:inset 0 3px 3px #fff9;
+  pointer-events:none;
 }
 
 .fridge-title {
-  position: absolute;
-  left: 50%;
-  top: 54px;
-  transform: translateX(-50%);
-  margin: 0;
-  font-family: "Fredoka", sans-serif;
-  font-weight: 600;
-  font-size: 64px;
-  color: var(--title-pink);
+  position:absolute;
+  left:50%;
+  top:42px;
+  transform:translateX(-50%) rotate(-2deg);
+  margin:0;
+  font-family:'Fredoka',sans-serif;
+  font-size:88px;
+  font-weight:600;
+  letter-spacing:-2px;
+  color:#e98b9d;
+  text-shadow:0 2px 0 #fff7,0 -1px 0 #ca718855;
+}
+
+.fridge-handle {
+  position:absolute;
+  right:8px;
+  top:42%;
+  width:26px;
+  height:38%;
+  border-radius:12px;
+  background:linear-gradient(90deg,#867f75,#fffaf0 22%,#d5cfc5 37%,#9c9489 70%,#ebe4d9 90%);
+  border:2px solid #b3aa9d;
+  box-shadow:-8px 6px 7px #72655340,inset 1px 0 1px white;
+  z-index:2;
+}
+
+.fridge-handle:before,.fridge-handle:after {
+  content:'';
+  position:absolute;
+  right:0;
+  width:37px;
+  height:17px;
+  background:inherit;
+  border:inherit;
+  border-radius:7px;
+  z-index:-1;
+}
+
+.fridge-handle:before {
+  top:-5px;
+}
+
+.fridge-handle:after {
+  bottom:-5px;
 }
 
 .polaroid {
-  position: absolute;
-  appearance: none;
-  border: 0;
-  padding: 9px 9px 28px;
-  background: #fff;
-  box-shadow: 0 10px 22px rgba(40, 30, 40, 0.08);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  position:absolute;
+  appearance:none;
+  border:1px solid #fffc;
+  padding:10px 10px 37px;
+  background:linear-gradient(130deg,#fffdf6,#eee8de);
+  box-shadow:1px 2px 1px #baa99844,5px 9px 9px #76665133,12px 18px 24px #7a6a5722;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  transition:filter .2s,box-shadow .2s;
+  user-select:none;
 }
 
-.polaroid .caption,
-.expanded-polaroid figcaption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 8px;
-  text-align: center;
-  font-size: 11px;
-  color: var(--caption);
-  letter-spacing: 0.01em;
+.polaroid:hover {
+  filter:brightness(1.025);
+  box-shadow:2px 3px 2px #baa99844,7px 13px 14px #76665144,12px 18px 24px #7a6a5722;
+}
+
+.polaroid .caption,.expanded-polaroid figcaption {
+  position:absolute;
+  left:4px;
+  right:4px;
+  bottom:11px;
+  text-align:center;
+  white-space:nowrap;
+  font-size:12px;
+  color:#514b46;
+  letter-spacing:-.04em;
 }
 
 .magnet {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffe4d8, var(--peach-pin));
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
-  z-index: 2;
+  position:absolute;
+  width:23px;
+  height:24px;
+  border-radius:50%;
+  background:radial-gradient(ellipse at 38% 25%,#ffd3be,#ecaa96 65%,#c48373 100%);
+  box-shadow:inset 1px 2px 2px #ffe6d9,1px 4px 0 #c68d7b,5px 10px 7px #5d463747;
+  z-index:2;
 }
 
 .pin-top .magnet {
-  top: -7px;
-  left: 50%;
-  transform: translateX(-50%);
+  top:-12px;
+  left:50%;
+  transform:translateX(-50%);
 }
 
 .pin-tl .magnet {
-  top: -6px;
-  left: 18px;
+  top:-12px;
+  left:18px;
 }
 
 .pin-tr .magnet {
-  top: -6px;
-  right: 18px;
+  top:-12px;
+  right:18px;
 }
 
 .bokeh {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  border-radius: 1px;
+  flex:1;
+  position:relative;
+  min-height:0;
+  overflow:hidden;
+  border-radius:1px;
+  background:linear-gradient(145deg,#aa9db9,#78b6bd 48%,#dec3a5);
+  box-shadow:inset 0 0 2px 1px #423a4344;
+}
+
+.bokeh:after {
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(125deg,#fff2,transparent 45%,#f7b2bd33);
+  box-shadow:inset 0 0 22px #8a8a9b22;
 }
 
 .orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(1px);
-}
-
-.bokeh-sky {
-  background: linear-gradient(160deg, #d8ecff, #f3e9ff 55%, #e7f8f0);
-}
-.bokeh-peach {
-  background: linear-gradient(160deg, #ffe4ec, #fff1d8 50%, #e8f3ff);
-}
-.bokeh-mint {
-  background: linear-gradient(160deg, #e4f8ef, #e8f0ff 50%, #fff4da);
-}
-.bokeh-lilac {
-  background: linear-gradient(160deg, #efe4ff, #e7f3ff 50%, #ffe9f2);
-}
-.bokeh-butter {
-  background: linear-gradient(160deg, #fff3c9, #ffe8f0 50%, #e8f6ff);
+  position:absolute;
+  border-radius:50%;
+  filter:blur(5px);
+  opacity:.85;
 }
 
 .o1 {
-  width: 46%;
-  height: 46%;
-  left: 8%;
-  top: 18%;
-  background: #fff;
-  opacity: 0.85;
+  width:38%;
+  height:32%;
+  left:8%;
+  top:25%;
+  background:#e9c8d3;
 }
+
 .o2 {
-  width: 28%;
-  height: 28%;
-  right: 10%;
-  top: 12%;
-  background: #cfe4ff;
-  opacity: 0.8;
+  width:28%;
+  height:27%;
+  right:10%;
+  top:10%;
+  background:#fff0d9;
 }
+
 .o3 {
-  width: 22%;
-  height: 22%;
-  left: 18%;
-  bottom: 16%;
-  background: #ffe29a;
-  opacity: 0.75;
+  width:42%;
+  height:36%;
+  left:36%;
+  bottom:10%;
+  background:#ffe2a0;
 }
+
 .o4 {
-  width: 18%;
-  height: 18%;
-  right: 22%;
-  bottom: 22%;
-  background: #ffc6de;
-  opacity: 0.7;
+  width:38%;
+  height:35%;
+  right:-14%;
+  bottom:7%;
+  background:#eab8ca;
 }
+
 .o5 {
-  width: 14%;
-  height: 14%;
-  left: 46%;
-  top: 8%;
-  background: #c8f3d8;
-  opacity: 0.7;
+  width:44%;
+  height:28%;
+  left:-10%;
+  bottom:-10%;
+  background:#d2d5a9;
 }
+
 .o6 {
-  width: 12%;
-  height: 12%;
-  right: 8%;
-  bottom: 10%;
-  background: #fff;
-  opacity: 0.65;
+  width:33%;
+  height:26%;
+  left:4%;
+  top:-7%;
+  background:#b5b5dc;
+}
+
+.bokeh-peach {
+  background:linear-gradient(145deg,#b7a3c8,#80b8bf 50%,#e6b7a3);
+}
+
+.bokeh-mint {
+  background:linear-gradient(145deg,#91b5ae,#77b3c1 55%,#c0b4c8);
+}
+
+.bokeh-lilac {
+  background:linear-gradient(150deg,#aca0c8,#8eaac0 50%,#b7c7b4);
+}
+
+.bokeh-butter {
+  background:linear-gradient(155deg,#a0c5c0,#96abc3 45%,#dcbda9);
 }
 
 .expand-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(1.5px);
+  position:fixed;
+  inset:0;
+  z-index:10;
+  display:grid;
+  place-items:center;
+  background:#e8dfd42b;
+  backdrop-filter:blur(1px);
+  cursor:zoom-out;
+  animation:reveal .25s ease;
 }
 
 .expanded-polaroid {
-  position: relative;
-  width: min(420px, 78vw);
-  height: min(530px, 78vh);
-  margin: 0;
-  padding: 16px 16px 52px;
-  background: #fff;
-  box-shadow: 0 22px 50px rgba(40, 30, 40, 0.16);
-  transform: rotate(-2deg);
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  width:min(430px,78vw,59svh);
+  height:auto;
+  aspect-ratio: .78;
+  margin:0;
+  padding:20px 20px 68px;
+  background:linear-gradient(135deg,#fffaf1,#efe8dc);
+  border:1px solid #fff9;
+  box-shadow:2px 3px 1px #bbaa9755,12px 22px 22px #5a473733,25px 35px 60px #6b574933;
+  transform:rotate(5deg);
+  animation:lift .35s cubic-bezier(.2,.8,.2,1);
+  cursor:default;
 }
 
 .expanded-polaroid .magnet {
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 20px;
+  top:-17px;
+  left:50%;
+  transform:translateX(-50%);
+  width:34px;
+  height:35px;
 }
 
 .expanded-polaroid figcaption {
-  font-size: 15px;
-  bottom: 16px;
+  font-size:clamp(14px,3.4vw,24px);
+  bottom:21px;
 }
 
-@media (max-width: 720px) {
+.gallery-status {
+  position:fixed;
+  inset:20px 0 auto;
+  z-index:5;
+  text-align:center;
+}
+
+.gallery-status button {
+  margin-left:12px;
+  cursor:pointer;
+}
+
+@keyframes reveal {
+  from {
+    opacity:0;
+  }
+  to {
+    opacity:1;
+  }
+}
+
+@keyframes lift {
+  from {
+    transform:rotate(0) scale(.8);
+    opacity:0;
+  }
+  to {
+    transform:rotate(5deg) scale(1);
+    opacity:1;
+  }
+}
+
+@media(max-width:600px) {
   .brand-title {
-    -webkit-text-stroke: 6px #fff;
+    font-size:clamp(40px,12vw,64px);
+    -webkit-text-stroke:7px #fff4ed;
+    margin-bottom:0;
   }
-  .fridge-title {
-    font-size: 48px;
+  .camera-stage {
+    height:68svh;
+    width:100vw;
   }
+  .sky-page {
+    justify-content:center;
+    padding-bottom:4svh;
+  }
+  .name-input {
+    height:34px;
+    font-size:16px;
+  }
+  .film-card-overlay {
+    padding:8px 10px;
+    gap:5px;
+  }
+  .cloud {
+    filter:blur(7px);
+  }
+  .expanded-polaroid {
+    padding:14px 14px 54px;
+  }
+  .expanded-polaroid figcaption {
+    bottom:18px;
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  *,*:before,*:after {
+    animation:none!important;
+    transition:none!important;
+  }
+}
+
+.polaroid-small .caption {
+  display:none;
+}
+
+.polaroid-small {
+  padding-bottom:22px;
+}
+
+.polaroid:nth-of-type(3n) .o1 {
+  left:40%;
+  top:10%;
+  width:26%;
+}
+
+.polaroid:nth-of-type(3n) .o3 {
+  left:8%;
+  bottom:6%;
+  width:30%;
+  height:25%;
+}
+
+.polaroid:nth-of-type(2n) .o2 {
+  top:35%;
+  right:32%;
+  width:38%;
+  height:33%;
+}
+
+.polaroid:nth-of-type(4n) .o4 {
+  right:2%;
+  bottom:24%;
+}
+
+
+.bokeh .orb {
+  height: auto;
+  aspect-ratio: 1;
 }

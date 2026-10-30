@@ -10,7 +10,7 @@ export function Polaroid({ item, onSelect }: Props) {
   return (
     <button
       type="button"
-      className={`polaroid pin-${item.pin}`}
+      className={`polaroid pin-${item.pin} ${item.width < 140 ? "polaroid-small" : ""}`}
       style={{
         left: item.x,
         top: item.y,

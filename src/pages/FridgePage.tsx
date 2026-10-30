@@ -5,9 +5,9 @@ import { fetchMoments, fetchSession, type MomentItem } from "../lib/api.ts";
 import type { FridgeViewState } from "../three/fridge/types.ts";
 // 3D upgrade path: createFridgeScene() in src/three/fridge/createFridgeScene.ts
 
-const WALL_WIDTH = 1700;
+const WALL_WIDTH = 720;
 const WALL_HEIGHT = 1200;
-const MIN_SCALE = 0.45;
+const MIN_SCALE = 0.18;
 const MAX_SCALE = 2.6;
 
 type Camera = FridgeViewState;
@@ -30,22 +30,27 @@ export function FridgePage() {
   const [items, setItems] = useState<MomentItem[]>([]);
   const [expanded, setExpanded] = useState<MomentItem | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const ok = await fetchSession();
-      if (!ok) {
-        window.location.replace("/");
-        return;
-      }
       try {
+        const ok = await fetchSession();
+        if (cancelled) return;
+        if (!ok) {
+          window.location.replace("/");
+          return;
+        }
         const next = await fetchMoments();
         if (!cancelled) {
           setItems(next);
           setReady(true);
         }
       } catch (error) {
+        if (cancelled) return;
+        setLoadError(true);
         if (error instanceof Error && error.message === "unauthorized") {
           window.location.replace("/");
         }
@@ -54,7 +59,7 @@ export function FridgePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -71,17 +76,23 @@ export function FridgePage() {
     if (!viewport || !ready) {
       return;
     }
+    const fit = () => {
     const rect = viewport.getBoundingClientRect();
     const scale = clamp(
-      Math.min(rect.width / WALL_WIDTH, rect.height / WALL_HEIGHT) * 0.98,
+      Math.min(rect.width / (WALL_WIDTH + 24), rect.height / (WALL_HEIGHT + 100)) * 0.98,
       MIN_SCALE,
       MAX_SCALE,
     );
     commitCam({
       scale,
       x: (rect.width - WALL_WIDTH * scale) / 2,
-      y: (rect.height - WALL_HEIGHT * scale) / 2,
+      y: Math.max(8, (rect.height - (WALL_HEIGHT + 80) * scale) / 2),
     });
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(viewport);
+    return () => observer.disconnect();
   }, [ready]);
 
   useEffect(() => {
@@ -126,7 +137,8 @@ export function FridgePage() {
     if (expanded) {
       return;
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.button !== 0) return;
+    if (pointers.current.size === 0) skipClick.current = false;
     pointers.current.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
@@ -141,6 +153,8 @@ export function FridgePage() {
       };
     }
     if (pointers.current.size === 2) {
+      skipClick.current = true;
+      for (const id of pointers.current.keys()) event.currentTarget.setPointerCapture(id);
       const [a, b] = [...pointers.current.values()];
       pinchStart.current = {
         distance: Math.hypot(a.x - b.x, a.y - b.y),
@@ -174,7 +188,10 @@ export function FridgePage() {
       const dy = event.clientY - drag.current.y;
       if (Math.hypot(dx, dy) > 8) {
         drag.current.moved = true;
+        skipClick.current = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
       }
+      if (!drag.current.moved) return;
       commitCam({
         ...camRef.current,
         x: drag.current.camX + dx,
@@ -187,6 +204,10 @@ export function FridgePage() {
     pointers.current.delete(event.pointerId);
     if (pointers.current.size < 2) {
       pinchStart.current = null;
+    }
+    if (pointers.current.size === 1) {
+      const [remaining] = pointers.current.values();
+      drag.current = { ...remaining, camX: camRef.current.x, camY: camRef.current.y, moved: true };
     }
     if (pointers.current.size === 0) {
       if (drag.current?.moved) {
@@ -206,6 +227,9 @@ export function FridgePage() {
 
   return (
     <main className="fridge-page">
+      {!ready && <div className="gallery-status" role="status">
+        {loadError ? <>相册加载失败，请重试。<button onClick={() => { setLoadError(false); setAttempt(value => value + 1); }}>重试</button></> : "正在加载相册…"}
+      </div>}
       <div
         ref={viewportRef}
         className="fridge-viewport"

@@ -1,22 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { InstaxCamera } from "../components/InstaxCamera.tsx";
-import { createSession, fetchSession } from "../lib/api.ts";
+import { createSession } from "../lib/api.ts";
 
 export function EntryPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchSession().then((ok) => {
-      if (!cancelled && ok) {
-        window.location.replace("/gallery");
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function onSubmitName(name: string) {
     setBusy(true);

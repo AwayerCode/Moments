@@ -19,6 +19,7 @@ export function InstaxCamera({ busy, error, onSubmitName }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const shakeRef = useRef<(amount: number) => void>(() => {});
   const [name, setName] = useState("");
+  const [fallback, setFallback] = useState(false);
   const [cardReady, setCardReady] = useState(false);
 
   useEffect(() => {
@@ -58,6 +59,10 @@ export function InstaxCamera({ busy, error, onSubmitName }: Props) {
         },
       });
       shakeRef.current = scene.setShake;
+    }).catch(() => {
+      if (cancelled) return;
+      setFallback(true);
+      setCardReady(true);
     });
 
     return () => {
@@ -109,7 +114,7 @@ export function InstaxCamera({ busy, error, onSubmitName }: Props) {
       />
       <form
         ref={formRef}
-        className={`film-card-overlay ${cardReady ? "ready" : ""}`}
+        className={`film-card-overlay ${cardReady ? "ready" : ""} ${fallback ? "fallback" : ""}`}
         onSubmit={onSubmit}
       >
         <label className="name-label" htmlFor="guest-name">

@@ -14,7 +14,9 @@ export type MomentItem = {
 
 export async function fetchSession(): Promise<boolean> {
   const response = await fetch("/api/session", { credentials: "same-origin" });
-  return response.ok;
+  if (response.status === 401) return false;
+  if (!response.ok) throw new Error("session_failed");
+  return true;
 }
 
 export async function createSession(

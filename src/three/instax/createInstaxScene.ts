@@ -1,6 +1,9 @@
 import {
   AmbientLight,
-  BoxGeometry,
+  CatmullRomCurve3,
+  TubeGeometry,
+  PMREMGenerator,
+  PlaneGeometry,
   CanvasTexture,
   Color,
   CylinderGeometry,
@@ -17,6 +20,8 @@ import {
   TorusGeometry,
   Vector3,
 } from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { easeOutBack, mountWebGL } from "../core.ts";
 
 export type CardScreenRect = {
@@ -38,8 +43,8 @@ type Options = {
   onFrame?: () => void;
 };
 
-const BLOSSOM = new Color("#f7c4d2");
-const BLOSSOM_DEEP = new Color("#eeadc0");
+const BLOSSOM = new Color("#ed8b95");
+const BLOSSOM_DEEP = new Color("#da7587");
 
 export function createInstaxScene(
   canvas: HTMLCanvasElement,
@@ -47,11 +52,18 @@ export function createInstaxScene(
 ): InstaxScene {
   const host = mountWebGL(canvas, { alpha: true });
   const scene = new Scene();
+  const pmrem = new PMREMGenerator(host.renderer);
+  const room = new RoomEnvironment();
+  const environment = pmrem.fromScene(room, .04);
+  scene.environment = environment.texture;
+  scene.environmentIntensity = .45;
+  room.dispose();
+  pmrem.dispose();
   const camera = new PerspectiveCamera(30, 1, 0.1, 40);
-  camera.position.set(0, -0.15, 8.4);
+  camera.position.set(0, -0.22, 9.3);
 
-  const hemi = new HemisphereLight("#fff7fb", "#f4c4d4", 1.15);
-  const sun = new DirectionalLight("#fff6ee", 1.35);
+  const hemi = new HemisphereLight("#fff7fb", "#f4c4d4", .8);
+  const sun = new DirectionalLight("#fff6ee", 1.05);
   sun.position.set(-3.2, 4.4, 5.2);
   const fill = new DirectionalLight("#cfe6ff", 0.45);
   fill.position.set(3.4, -1.2, 2.4);
@@ -70,12 +82,12 @@ export function createInstaxScene(
   let shake = 0;
   let elapsed = 0;
 
-  const slotHidden = { y: 0.02, scaleY: 0.12 };
-  const slotShown = { y: -1.62, scaleY: 1 };
+  const slotHidden = { y: -.65, scaleY: .04 };
+  const slotShown = { y: -1.8, scaleY: 1 };
 
   function applyCardPose() {
     const t = easeOutBack(eject);
-    card.position.set(0, lerp(slotHidden.y, slotShown.y, t), 0.18);
+    card.position.set(0, lerp(slotHidden.y, slotShown.y, t), 0.65);
     card.scale.set(1, lerp(slotHidden.scaleY, slotShown.scaleY, t), 1);
     card.rotation.z = Math.sin(elapsed * 28) * shake * 0.08;
     card.visible = eject > 0.02;
@@ -84,6 +96,7 @@ export function createInstaxScene(
   function resizeCamera() {
     const { width, height } = host.resize();
     camera.aspect = width / height;
+    camera.position.z = Math.max(9.3, 7.4 / camera.aspect);
     camera.updateProjectionMatrix();
   }
 
@@ -94,7 +107,8 @@ export function createInstaxScene(
   host.start((delta, time) => {
     elapsed = time;
     shake = Math.max(0, shake - delta * 2.4);
-    root.rotation.y = Math.sin(time * 0.55) * 0.07;
+    root.rotation.y = -.08 + Math.sin(time * .55) * .025;
+    root.rotation.z = -.025;
     root.position.y = Math.sin(time * 0.9) * 0.045;
     applyCardPose();
     host.renderer.render(scene, camera);
@@ -119,10 +133,10 @@ export function createInstaxScene(
       }
       card.updateMatrixWorld(true);
       const corners = [
-        new Vector3(-0.62, 0.72, 0.03),
-        new Vector3(0.62, 0.72, 0.03),
-        new Vector3(-0.62, -0.72, 0.03),
-        new Vector3(0.62, -0.72, 0.03),
+        new Vector3(-.87, .55, .04),
+        new Vector3(.87, .55, .04),
+        new Vector3(-.87, -.48, .04),
+        new Vector3(.87, -.48, .04),
       ].map((point) => point.applyMatrix4(card.matrixWorld).project(camera));
       const xs = corners.map((point) => (point.x * 0.5 + 0.5) * canvas.clientWidth);
       const ys = corners.map((point) => (-point.y * 0.5 + 0.5) * canvas.clientHeight);
@@ -154,6 +168,7 @@ export function createInstaxScene(
           }
         }
       });
+      environment.dispose();
       host.dispose();
     },
   };
@@ -161,141 +176,69 @@ export function createInstaxScene(
 
 function buildCameraBody(): Group {
   const group = new Group();
-  const plastic = new MeshPhysicalMaterial({
-    color: BLOSSOM,
-    roughness: 0.32,
-    metalness: 0.04,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.35,
-  });
-  const plasticDeep = plastic.clone();
-  plasticDeep.color = BLOSSOM_DEEP;
-
-  const shell = new Mesh(new BoxGeometry(2.35, 2.72, 0.92), plastic);
-  shell.position.y = 0.42;
-  group.add(shell);
-
-  const face = new Mesh(new BoxGeometry(2.12, 2.48, 0.18), plasticDeep);
-  face.position.set(0, 0.42, 0.42);
-  group.add(face);
-
-  const strap = new Mesh(
-    new TorusGeometry(1.18, 0.075, 12, 28, Math.PI * 1.05),
-    plastic,
-  );
-  strap.position.set(-1.28, 0.15, 0);
-  strap.rotation.set(1.15, 0, 1.2);
-  group.add(strap);
-
-  const flash = new Mesh(
-    new BoxGeometry(0.34, 0.16, 0.12),
-    new MeshStandardMaterial({
-      color: "#efe8ec",
-      roughness: 0.2,
-      metalness: 0.35,
-    }),
-  );
-  flash.position.set(-0.78, 1.48, 0.5);
-  group.add(flash);
-
-  const viewfinder = new Mesh(
-    new CylinderGeometry(0.07, 0.07, 0.1, 20),
-    new MeshStandardMaterial({ color: "#222", roughness: 0.4 }),
-  );
-  viewfinder.rotation.x = Math.PI / 2;
-  viewfinder.position.set(-0.42, 1.48, 0.5);
-  group.add(viewfinder);
-
-  const lamp = new Mesh(
-    new SphereGeometry(0.045, 16, 16),
-    new MeshStandardMaterial({
-      color: "#ff8a3d",
-      emissive: "#ff7a2d",
-      emissiveIntensity: 0.85,
-    }),
-  );
-  lamp.position.set(-0.18, 1.5, 0.5);
-  group.add(lamp);
-
-  const label = new Mesh(
-    new BoxGeometry(0.55, 0.28, 0.01),
-    new MeshStandardMaterial({ map: brandTexture(), roughness: 0.6 }),
-  );
-  label.position.set(0.78, 1.46, 0.51);
-  group.add(label);
-
-  const ring = new Mesh(
-    new CylinderGeometry(0.78, 0.78, 0.16, 40),
-    plastic,
-  );
-  ring.rotation.x = Math.PI / 2;
-  ring.position.set(0, 0.34, 0.55);
-  group.add(ring);
-
-  const ringInner = new Mesh(
-    new CylinderGeometry(0.58, 0.58, 0.1, 40),
-    plasticDeep,
-  );
-  ringInner.rotation.x = Math.PI / 2;
-  ringInner.position.set(0, 0.34, 0.62);
-  group.add(ringInner);
-
-  const glass = new Mesh(
-    new SphereGeometry(0.42, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.55),
-    new MeshPhysicalMaterial({
-      color: "#111",
-      roughness: 0.08,
-      metalness: 0.55,
-      clearcoat: 1,
-    }),
-  );
-  glass.rotation.x = Math.PI;
-  glass.position.set(0, 0.34, 0.62);
-  group.add(glass);
-
-  const core = new Mesh(
-    new CylinderGeometry(0.16, 0.16, 0.08, 24),
-    new MeshStandardMaterial({ color: "#050505", roughness: 0.25 }),
-  );
-  core.rotation.x = Math.PI / 2;
-  core.position.set(0, 0.34, 0.78);
-  group.add(core);
-
-  const shutter = new Mesh(
-    new SphereGeometry(0.16, 24, 24),
-    new MeshStandardMaterial({
-      color: "#ff8a4a",
-      roughness: 0.25,
-      metalness: 0.12,
-    }),
-  );
-  shutter.position.set(-0.72, 0.86, 0.58);
-  group.add(shutter);
-
-  const shutterRing = new Mesh(
-    new TorusGeometry(0.17, 0.03, 10, 24),
-    new MeshStandardMaterial({ color: "#f4c2b0", roughness: 0.35 }),
-  );
-  shutterRing.position.copy(shutter.position);
-  group.add(shutterRing);
-
-  const slot = new Mesh(
-    new BoxGeometry(1.42, 0.1, 0.22),
-    new MeshStandardMaterial({ color: "#e7a9bb", roughness: 0.45 }),
-  );
-  slot.position.set(0, -0.88, 0.28);
-  group.add(slot);
-
+  const plastic = new MeshPhysicalMaterial({ color: BLOSSOM, roughness: .3, metalness: .03, clearcoat: .8, clearcoatRoughness: .23 });
+  const deep = plastic.clone(); deep.color = BLOSSOM_DEEP;
+  const dark = new MeshPhysicalMaterial({ color: "#191b22", roughness: .2, metalness: .4, clearcoat: 1 });
+  const silver = new MeshStandardMaterial({ color: "#e6d9ce", metalness: .85, roughness: .22 });
+  function box(w: number, h: number, d: number, radius: number, material: MeshStandardMaterial, x: number, y: number, z: number) {
+    const mesh = new Mesh(new RoundedBoxGeometry(w, h, d, 5, radius), material);
+    mesh.position.set(x, y, z); group.add(mesh); return mesh;
+  }
+  function disc(radius: number, depth: number, material: MeshStandardMaterial, x: number, y: number, z: number) {
+    const mesh = new Mesh(new CylinderGeometry(radius, radius, depth, 80), material);
+    mesh.rotation.x = Math.PI / 2; mesh.position.set(x, y, z); group.add(mesh); return mesh;
+  }
+  function ring(radius: number, tube: number, material: MeshStandardMaterial, x: number, y: number, z: number) {
+    const mesh = new Mesh(new TorusGeometry(radius, tube, 16, 80), material);
+    mesh.position.set(x, y, z); group.add(mesh);
+  }
+  box(2.9, 3.12, .95, .38, deep, 0, .38, -.09);
+  box(2.8, 3.04, .62, .32, plastic, .035, .4, .18);
+  box(.55, 2.5, .3, .18, plastic, -1.02, .42, .49);
+  // Silver reflector and its translucent ribbed flash cover.
+  box(.45, .97, .16, .19, silver, -.32, 1.25, .57);
+  box(.34, .85, .13, .14, new MeshPhysicalMaterial({ color: '#fff6e9', metalness: .2, roughness: .14, transparent: true, opacity: .7 }), -.32, 1.25, .67);
+  for (let i = 0; i < 9; i++) box(.27, .018, .015, .006, silver, -.32, .94 + i * .075, .75);
+  box(.24, .34, .1, .035, dark, -.94, 1.24, .69);
+  box(.11, .2, .04, .025, silver, -.94, 1.24, .75);
+  disc(.07, .05, dark, .28, 1.43, .55);
+  disc(.07, .05, dark, .28, 1.23, .55);
+  const label = new Mesh(new PlaneGeometry(.65, .38), new MeshStandardMaterial({ map: brandTexture(), transparent: true, roughness: .5 }));
+  label.position.set(.88, 1.32, .51); group.add(label);
+  // Concentric lens housing with a convex glass element and reflected highlights.
+  disc(.9, .22, deep, .34, -.02, .58);
+  disc(.84, .22, plastic, .34, -.02, .72);
+  ring(.79, .025, deep, .34, -.02, .85);
+  disc(.43, .12, dark, .34, -.02, .86);
+  ring(.37, .025, silver, .34, -.02, .94);
+  disc(.33, .06, dark, .34, -.02, .95);
+  ring(.27, .025, dark, .34, -.02, .99);
+  const glass = new Mesh(new SphereGeometry(.24, 40, 24), new MeshPhysicalMaterial({color:'#182532',metalness:.45,roughness:.06,clearcoat:1}));
+  glass.scale.z = .35; glass.position.set(.34, -.02, 1); group.add(glass);
+  const glint = new Mesh(new SphereGeometry(.055,16,12),new MeshStandardMaterial({color:'#d5e7f3',emissive:'#9bb0c2',emissiveIntensity:.3}));
+  glint.scale.set(1,.5,.2);glint.position.set(.27,.07,1.08);group.add(glint);
+  box(.18,.29,.06,.07,silver,-.3,.02,.89);
+  disc(.25,.12,deep,-.94,.55,.7);
+  ring(.205,.025,new MeshStandardMaterial({color:'#efa567',metalness:.6,roughness:.25}),-.94,.55,.79);
+  disc(.17,.08,plastic,-.94,.55,.8);
+  box(2.12,.13,.14,.04,dark,0,-.99,.53);
+  // A continuous soft wrist strap instead of the original open torus.
+  const path = new CatmullRomCurve3([
+    new Vector3(-1.4,.9,0), new Vector3(-1.8,.4,.05), new Vector3(-1.95,-.9,.1),
+    new Vector3(-1.65,-1.7,.2), new Vector3(-1.18,-1.84,.25), new Vector3(-1.46,-1.1,.1),
+    new Vector3(-1.65,.15,0), new Vector3(-1.4,.9,0),
+  ]);
+  group.add(new Mesh(new TubeGeometry(path,80,.042,10,false),deep));
+  box(.17,.48,.18,.06,deep,-1.77,-.05,.08);
   return group;
 }
 
 function buildFilmCard(): Group {
   const group = new Group();
-  const paper = new Mesh(
-    new BoxGeometry(1.28, 1.52, 0.045),
-    new MeshStandardMaterial({ color: "#ffffff", roughness: 0.55 }),
-  );
+  const paper = new Mesh(new RoundedBoxGeometry(2,1.58,.04,3,.035), new MeshStandardMaterial({color:'#fff8ec',roughness:.85}));
   group.add(paper);
+  const inset = new Mesh(new PlaneGeometry(1.8,1.28),new MeshStandardMaterial({color:'#ee8f92',roughness:.65}));
+  inset.position.set(0,.025,.023); group.add(inset);
   return group;
 }
 

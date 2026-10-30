@@ -40,8 +40,12 @@ export default {
       if (!(await hasValidSession(env, request))) {
         return json({ error: "未登录" }, 401);
       }
-      const items = await listMoments(env);
-      return json({ items });
+      try {
+        const items = await listMoments(env);
+        return json({ items });
+      } catch {
+        return json({ error: "相册暂时无法加载" }, 503);
+      }
     }
 
     if (url.pathname.startsWith("/api/media/") && request.method === "GET") {
