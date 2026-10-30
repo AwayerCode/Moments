@@ -1,0 +1,31 @@
+# Sisi Moments — Cloudflare Workers + Assets
+# Hostname: workers.dev only (later HK reverse proxy). No custom domain.
+# R2: private bucket only. Never enable r2.dev public access.
+
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "sisi-moments"
+compatibility_date = "2026-10-30"
+main = "./worker/index.ts"
+workers_dev = true
+preview_urls = false
+upload_source_maps = true
+
+[observability]
+enabled = true
+
+[observability.traces]
+enabled = true
+
+[secrets]
+required = ["ACCESS_SALT", "ACCESS_NAME_HASH", "SESSION_SECRET"]
+
+[assets]
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Private family media. Serve only through the authenticated Worker
+# (`GET /api/media/...`). Do not attach a public r2.dev domain.
+[[r2_buckets]]
+binding = "MOMENTS_BUCKET"
+bucket_name = "sisi-moments"

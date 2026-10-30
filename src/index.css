@@ -1,0 +1,468 @@
+:root {
+  --blossom: #f7c4d2;
+  --blossom-deep: #f3a8bc;
+  --blossom-ink: #ff8fb0;
+  --title-pink: #ffb3c6;
+  --sky-top: #8ec8ff;
+  --sky-mid: #c7e6ff;
+  --sky-bottom: #fff4f8;
+  --fridge: #fbfbfb;
+  --caption: #2b2b2b;
+  --peach-pin: #f6c3b4;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Noto Sans SC", "Fredoka", system-ui, sans-serif;
+  background: var(--sky-bottom);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+/* ---------- Entry / sky ---------- */
+
+.sky-page {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 7vh 16px 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, #fff7 0%, transparent 55%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-bottom) 100%);
+}
+
+.sky-glow {
+  position: absolute;
+  inset: 0 auto auto 50%;
+  width: 280px;
+  height: 280px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, #fff 0%, #fff0 68%);
+  pointer-events: none;
+}
+
+.clouds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cloud {
+  position: absolute;
+  background: #fff;
+  border-radius: 999px;
+  filter: blur(0.2px);
+  opacity: 0.92;
+}
+
+.cloud::before,
+.cloud::after {
+  content: "";
+  position: absolute;
+  background: #fff;
+  border-radius: 999px;
+}
+
+.cloud.c1 {
+  width: 160px;
+  height: 42px;
+  top: 18%;
+  left: 8%;
+}
+.cloud.c1::before {
+  width: 70px;
+  height: 70px;
+  left: 18px;
+  top: -38px;
+}
+.cloud.c1::after {
+  width: 56px;
+  height: 56px;
+  right: 16px;
+  top: -24px;
+}
+
+.cloud.c2 {
+  width: 120px;
+  height: 34px;
+  top: 12%;
+  right: 10%;
+}
+.cloud.c2::before {
+  width: 50px;
+  height: 50px;
+  left: 16px;
+  top: -28px;
+}
+
+.cloud.c3 {
+  width: 180px;
+  height: 46px;
+  bottom: 16%;
+  left: 6%;
+  opacity: 0.8;
+}
+.cloud.c3::before {
+  width: 80px;
+  height: 80px;
+  left: 24px;
+  top: -42px;
+}
+
+.cloud.c4 {
+  width: 140px;
+  height: 38px;
+  bottom: 22%;
+  right: 8%;
+  opacity: 0.75;
+}
+.cloud.c4::before {
+  width: 60px;
+  height: 60px;
+  right: 18px;
+  top: -32px;
+}
+
+.brand-title {
+  position: relative;
+  z-index: 2;
+  margin: 0 0 4vh;
+  font-family: "Fredoka", "Noto Sans SC", sans-serif;
+  font-weight: 700;
+  font-size: clamp(42px, 10vw, 72px);
+  letter-spacing: 0.02em;
+  color: var(--title-pink);
+  -webkit-text-stroke: 8px #fff;
+  paint-order: stroke fill;
+  text-shadow:
+    0 3px 0 #ffe0ea,
+    0 8px 0 #ffd0de,
+    0 14px 24px rgba(255, 150, 180, 0.28);
+}
+
+.camera-stage {
+  position: relative;
+  z-index: 2;
+  width: min(420px, 92vw);
+  height: min(560px, 62svh);
+}
+
+.instax-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.film-card-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  padding: 18% 12% 10%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.film-card-overlay.ready {
+  pointer-events: auto;
+}
+
+.film-card-overlay.shake {
+  animation: shake 0.42s ease;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  75% {
+    transform: translateX(6px);
+  }
+}
+
+.name-label {
+  font-size: 13px;
+  color: #6b6b6b;
+  padding-left: 10px;
+}
+
+.name-input {
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: #f7e4ea;
+  padding: 0 14px;
+  color: #444;
+  outline: none;
+  caret-color: #888;
+}
+
+.name-input:focus {
+  box-shadow: 0 0 0 3px #ffd0dc;
+}
+
+.entry-error {
+  position: relative;
+  z-index: 2;
+  min-height: 1.4em;
+  margin: 18px 0 0;
+  color: #d25b7a;
+  font-size: 14px;
+  opacity: 0;
+}
+
+.entry-error.visible {
+  opacity: 1;
+}
+
+/* ---------- Fridge wall ---------- */
+
+.fridge-page,
+.fridge-viewport {
+  width: 100%;
+  height: 100svh;
+  background: #f3f3f3;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.fridge-world {
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.fridge-door {
+  position: relative;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%);
+  box-shadow:
+    inset 0 0 0 1px #f0f0f0,
+    18px 0 40px rgba(0, 0, 0, 0.04);
+  border-right: 1px solid #ececec;
+}
+
+.fridge-handle {
+  position: absolute;
+  right: 18px;
+  top: 18%;
+  width: 14px;
+  height: 42%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f2f2f2, #fff);
+  box-shadow:
+    inset 1px 0 0 #fff,
+    -2px 0 6px rgba(0, 0, 0, 0.06);
+}
+
+.fridge-title {
+  position: absolute;
+  left: 50%;
+  top: 54px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-family: "Fredoka", sans-serif;
+  font-weight: 600;
+  font-size: 64px;
+  color: var(--title-pink);
+}
+
+.polaroid {
+  position: absolute;
+  appearance: none;
+  border: 0;
+  padding: 9px 9px 28px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(40, 30, 40, 0.08);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.polaroid .caption,
+.expanded-polaroid figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--caption);
+  letter-spacing: 0.01em;
+}
+
+.magnet {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe4d8, var(--peach-pin));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+}
+
+.pin-top .magnet {
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pin-tl .magnet {
+  top: -6px;
+  left: 18px;
+}
+
+.pin-tr .magnet {
+  top: -6px;
+  right: 18px;
+}
+
+.bokeh {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 1px;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(1px);
+}
+
+.bokeh-sky {
+  background: linear-gradient(160deg, #d8ecff, #f3e9ff 55%, #e7f8f0);
+}
+.bokeh-peach {
+  background: linear-gradient(160deg, #ffe4ec, #fff1d8 50%, #e8f3ff);
+}
+.bokeh-mint {
+  background: linear-gradient(160deg, #e4f8ef, #e8f0ff 50%, #fff4da);
+}
+.bokeh-lilac {
+  background: linear-gradient(160deg, #efe4ff, #e7f3ff 50%, #ffe9f2);
+}
+.bokeh-butter {
+  background: linear-gradient(160deg, #fff3c9, #ffe8f0 50%, #e8f6ff);
+}
+
+.o1 {
+  width: 46%;
+  height: 46%;
+  left: 8%;
+  top: 18%;
+  background: #fff;
+  opacity: 0.85;
+}
+.o2 {
+  width: 28%;
+  height: 28%;
+  right: 10%;
+  top: 12%;
+  background: #cfe4ff;
+  opacity: 0.8;
+}
+.o3 {
+  width: 22%;
+  height: 22%;
+  left: 18%;
+  bottom: 16%;
+  background: #ffe29a;
+  opacity: 0.75;
+}
+.o4 {
+  width: 18%;
+  height: 18%;
+  right: 22%;
+  bottom: 22%;
+  background: #ffc6de;
+  opacity: 0.7;
+}
+.o5 {
+  width: 14%;
+  height: 14%;
+  left: 46%;
+  top: 8%;
+  background: #c8f3d8;
+  opacity: 0.7;
+}
+.o6 {
+  width: 12%;
+  height: 12%;
+  right: 8%;
+  bottom: 10%;
+  background: #fff;
+  opacity: 0.65;
+}
+
+.expand-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(1.5px);
+}
+
+.expanded-polaroid {
+  position: relative;
+  width: min(420px, 78vw);
+  height: min(530px, 78vh);
+  margin: 0;
+  padding: 16px 16px 52px;
+  background: #fff;
+  box-shadow: 0 22px 50px rgba(40, 30, 40, 0.16);
+  transform: rotate(-2deg);
+}
+
+.expanded-polaroid .magnet {
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+}
+
+.expanded-polaroid figcaption {
+  font-size: 15px;
+  bottom: 16px;
+}
+
+@media (max-width: 720px) {
+  .brand-title {
+    -webkit-text-stroke: 6px #fff;
+  }
+  .fridge-title {
+    font-size: 48px;
+  }
+}
