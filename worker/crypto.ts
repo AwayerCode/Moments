@@ -1,7 +1,7 @@
 const encoder = new TextEncoder();
 
-export function normalizeName(name: string): string {
-  return name.trim().normalize("NFC");
+export function normalizeAccessSecret(value: string): string {
+  return value.trim().normalize("NFC");
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -9,11 +9,11 @@ export async function sha256Hex(value: string): Promise<string> {
   return toHex(new Uint8Array(digest));
 }
 
-export async function hashAccessName(
+export async function hashAccessSecret(
   salt: string,
-  name: string,
+  value: string,
 ): Promise<string> {
-  return sha256Hex(`${salt}\0${normalizeName(name)}`);
+  return sha256Hex(`${salt}\0${normalizeAccessSecret(value)}`);
 }
 
 export async function hmacHex(secret: string, data: string): Promise<string> {

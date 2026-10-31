@@ -10,7 +10,7 @@
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
     "types": "wrangler types",
-    "hash-name": "node scripts/hash-name.mjs"
+    "hash-invite": "node scripts/hash-invite.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",

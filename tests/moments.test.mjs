@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { listMoments } from '../worker/moments.ts';
+import { listMoments, listMomentsPage } from '../worker/moments.ts';
 
 const valid = { id: 'photo', caption: 'Example', palette: 'sky' };
 function envFor(records) {
@@ -40,4 +40,44 @@ test('continues listing past the first R2 page', async () => {
   } });
   assert.deepEqual(cursors, [undefined, 'page2']);
   assert.equal(items[0].id, valid.id);
+});
+
+test('returns one metadata page and preserves the R2 cursor', async () => {
+  const calls = [];
+  const page = await listMomentsPage({ MOMENTS_BUCKET: {
+    list: async options => {
+      calls.push(options);
+      return {
+        objects: [{ key: 'moments/photo.json' }],
+        truncated: true,
+        cursor: 'next-page',
+      };
+    },
+    get: async () => ({ json: async () => valid }),
+  } }, 'current-page', 24);
+
+  assert.deepEqual(calls, [{
+    prefix: 'moments/',
+    cursor: 'current-page',
+    limit: 24,
+  }]);
+  assert.equal(page.items[0].id, valid.id);
+  assert.equal(page.nextCursor, 'next-page');
+});
+
+test('rejects media URLs outside the authenticated Worker route', async () => {
+  const items = await listMomentsPage(envFor({
+    'moments/external.json': JSON.stringify({
+      ...valid,
+      id: 'external',
+      src: 'https://public.example/photo.jpg',
+    }),
+    'moments/private.json': JSON.stringify({
+      ...valid,
+      id: 'private',
+      src: '/api/media/moments/photo.jpg',
+    }),
+  }));
+
+  assert.deepEqual(items.items.map(item => item.id), ['private']);
 });

@@ -3,6 +3,7 @@ export type Palette = "peach" | "sky" | "mint" | "lilac" | "butter";
 export type MomentItem = {
   id: string;
   caption: string;
+  src?: string;
   x: number;
   y: number;
   width: number;
@@ -19,34 +20,50 @@ export async function fetchSession(): Promise<boolean> {
   return true;
 }
 
-export async function createSession(
-  name: string,
-): Promise<{ ok: boolean; error?: string; status: number }> {
+export async function claimInviteFromLocation(): Promise<boolean> {
+  const pathMatch = window.location.pathname.match(/^\/i\/([^/]+)\/?$/);
+  const queryInvite = new URL(window.location.href).searchParams.get("invite");
+  const invite = pathMatch ? decodeURIComponent(pathMatch[1]) : queryInvite;
+  if (!invite) return false;
+
   const response = await fetch("/api/session", {
     method: "POST",
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ invite }),
   });
-  const data = (await response.json().catch(() => ({}))) as {
-    ok?: boolean;
-    error?: string;
-  };
-  return {
-    ok: Boolean(data.ok && response.ok),
-    error: data.error,
-    status: response.status,
-  };
+  if (!response.ok) {
+    throw new Error("invite_rejected");
+  }
+  window.history.replaceState({}, "", "/");
+  return true;
 }
 
-export async function fetchMoments(): Promise<MomentItem[]> {
-  const response = await fetch("/api/moments", { credentials: "same-origin" });
+export type MomentsPage = {
+  items: MomentItem[];
+  nextCursor: string | null;
+};
+
+export async function fetchMomentsPage(
+  cursor?: string,
+): Promise<MomentsPage> {
+  const params = new URLSearchParams({ limit: "48" });
+  if (cursor) params.set("cursor", cursor);
+  const response = await fetch(`/api/moments?${params}`, {
+    credentials: "same-origin",
+  });
   if (response.status === 401) {
     throw new Error("unauthorized");
   }
   if (!response.ok) {
     throw new Error("moments_failed");
   }
-  const data = (await response.json()) as { items?: MomentItem[] };
-  return data.items ?? [];
+  const data = (await response.json()) as {
+    items?: MomentItem[];
+    nextCursor?: string | null;
+  };
+  return {
+    items: data.items ?? [],
+    nextCursor: data.nextCursor ?? null,
+  };
 }

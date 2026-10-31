@@ -1,7 +1,7 @@
 import {
-  hashAccessName,
+  hashAccessSecret,
   hmacHex,
-  normalizeName,
+  normalizeAccessSecret,
   timingSafeEqualString,
 } from "./crypto.ts";
 
@@ -11,16 +11,19 @@ const SESSION_VERSION = "v1";
 
 export { COOKIE_NAME };
 
-export async function verifyAccessName(
+export async function verifyAccessInvite(
   env: Env,
-  name: string,
+  invite: string,
 ): Promise<boolean> {
-  const normalized = normalizeName(name);
-  if (!normalized || !env.ACCESS_SALT || !env.ACCESS_NAME_HASH) {
+  const normalized = normalizeAccessSecret(invite);
+  if (!normalized || !env.ACCESS_SALT || !env.ACCESS_INVITE_HASH) {
     return false;
   }
-  const digest = await hashAccessName(env.ACCESS_SALT, normalized);
-  return timingSafeEqualString(digest, env.ACCESS_NAME_HASH.trim().toLowerCase());
+  const digest = await hashAccessSecret(env.ACCESS_SALT, normalized);
+  return timingSafeEqualString(
+    digest,
+    env.ACCESS_INVITE_HASH.trim().toLowerCase(),
+  );
 }
 
 export async function issueSessionCookie(

@@ -2,10 +2,10 @@ import {
   clearSessionCookie,
   hasValidSession,
   issueSessionCookie,
-  verifyAccessName,
+  verifyAccessInvite,
 } from "./auth.ts";
 import { servePrivateObject } from "./media.ts";
-import { listMoments } from "./moments.ts";
+import { listMomentsPage } from "./moments.ts";
 import {
   clearFailures,
   clientKey,
@@ -41,8 +41,17 @@ export default {
         return json({ error: "未登录" }, 401);
       }
       try {
-        const items = await listMoments(env);
-        return json({ items });
+        const cursor = url.searchParams.get("cursor") ?? undefined;
+        const requestedLimit = Number(url.searchParams.get("limit") ?? 48);
+        const page = await listMomentsPage(
+          env,
+          cursor,
+          Number.isFinite(requestedLimit) ? requestedLimit : 48,
+        );
+        return json({
+          items: page.items,
+          nextCursor: page.nextCursor ?? null,
+        });
       } catch {
         return json({ error: "相册暂时无法加载" }, 503);
       }
@@ -65,21 +74,21 @@ async function createSession(request: Request, env: Env): Promise<Response> {
     return json({ ok: false, error: "试得太多次了，请稍后再试" }, 429);
   }
 
-  let name = "";
+  let invite = "";
   try {
-    const body = (await request.json()) as { name?: unknown };
-    if (typeof body.name === "string") {
-      name = body.name;
+    const body = (await request.json()) as { invite?: unknown };
+    if (typeof body.invite === "string") {
+      invite = body.invite;
     }
   } catch {
     recordFailure(key);
-    return json({ ok: false, error: "名字不对哦" }, 400);
+    return json({ ok: false, error: "邀请无效" }, 400);
   }
 
-  const matched = await verifyAccessName(env, name);
+  const matched = await verifyAccessInvite(env, invite);
   if (!matched) {
     recordFailure(key);
-    return json({ ok: false, error: "名字不对哦" }, 401);
+    return json({ ok: false, error: "邀请无效" }, 401);
   }
 
   clearFailures(key);
