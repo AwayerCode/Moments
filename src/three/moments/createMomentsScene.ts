@@ -1,10 +1,13 @@
 import {
   ACESFilmicToneMapping,
+  HalfFloatType,
+  TextureLoader,
+  WebGLRenderTarget,
+  Material,
   BoxGeometry,
   CanvasTexture,
   Color,
   CylinderGeometry,
-  DataTexture,
   DirectionalLight,
   Group,
   HemisphereLight,
@@ -18,7 +21,6 @@ import {
   PMREMGenerator,
   Raycaster,
   RepeatWrapping,
-  RGBAFormat,
   Scene,
   SphereGeometry,
   SpotLight,
@@ -28,6 +30,8 @@ import {
   WebGLRenderer,
   type Texture,
 } from "three";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -68,6 +72,7 @@ type GalleryCard = {
   hit: Mesh;
   target: Vector3;
   targetScale: number;
+  contact: Mesh<PlaneGeometry, MeshBasicMaterial>;
   targetRotation: number;
   texture?: Texture;
 };
@@ -102,16 +107,19 @@ export async function createMomentsScene(
     alpha: false,
     powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = SRGBColorSpace;
+  // ACES at ~0.94 (was 0.86) with brighter, neutral lights: clean pastels, no grey cast.
+  // (AgX was tried; it desaturated the pink camera and pastel prints too much.)
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.86;
+  renderer.toneMappingExposure = 0.94;
   renderer.shadowMap.enabled = true;
+  // r18x: PCFShadowMap is the soft PCF path (PCFSoftShadowMap was removed); softness via shadow.radius.
   renderer.shadowMap.type = PCFShadowMap;
-  renderer.setClearColor("#e7ddd1");
+  renderer.setClearColor("#f7f1ea");
 
   const scene = new Scene();
-  scene.background = new Color("#e7ddd1");
+  scene.background = new Color("#f7f1ea");
   const viewCamera = new PerspectiveCamera(33, 1, 0.08, 80);
   const desiredPosition = new Vector3(0, 0.45, 9.2);
   const desiredTarget = new Vector3(0, 0.35, 0);
@@ -123,13 +131,22 @@ export async function createMomentsScene(
   const room = new RoomEnvironment();
   const environment = pmrem.fromScene(room, 0.06);
   scene.environment = environment.texture;
-  scene.environmentIntensity = 0.72;
+  scene.environmentIntensity = 0.8;
   room.dispose();
   pmrem.dispose();
 
-  const grain = createGrainTexture();
-  const wallTexture = createPlasterTexture();
-  const woodTexture = createWoodTexture();
+  const maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const grain = loadRoomTexture("/textures/grain_normal.jpg", false, 6, 6, maxAnisotropy);
+  const wallTexture: RoomMaps = {
+    map: loadRoomTexture("/textures/plaster_albedo.jpg", true, 14, 2.8, maxAnisotropy),
+    normalMap: loadRoomTexture("/textures/plaster_normal.jpg", false, 14, 2.8, maxAnisotropy),
+    roughnessMap: loadRoomTexture("/textures/plaster_rough.jpg", false, 14, 2.8, maxAnisotropy),
+  };
+  const woodTexture: RoomMaps = {
+    map: loadRoomTexture("/textures/oak_albedo.jpg", true, 10, 4.25, maxAnisotropy),
+    normalMap: loadRoomTexture("/textures/oak_normal.jpg", false, 10, 4.25, maxAnisotropy),
+    roughnessMap: loadRoomTexture("/textures/oak_rough.jpg", false, 10, 4.25, maxAnisotropy),
+  };
   const loadedTextures = new Set<Texture>();
   const cards: GalleryCard[] = [];
   const animatedObjects: Array<{
@@ -174,8 +191,46 @@ export async function createMomentsScene(
   }
 
   const renderPass = new RenderPass(scene, viewCamera);
-  const composer = new EffectComposer(renderer);
+  // Multisampled HDR target: the composer bypasses the canvas' own MSAA.
+  const composerTarget = new WebGLRenderTarget(1, 1, {
+    type: HalfFloatType,
+    samples: 4,
+  });
+  const composer = new EffectComposer(renderer, composerTarget);
   composer.addPass(renderPass);
+  if (window.innerWidth >= 760) {
+    const aoPass = new GTAOPass(scene, viewCamera, 512, 512);
+    aoPass.output = GTAOPass.OUTPUT.Default;
+    aoPass.blendIntensity = 0.85;
+    aoPass.updateGtaoMaterial({ radius: 0.32, distanceExponent: 1.4, thickness: 1, scale: 1 });
+    aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+    // Keep invisible hit planes / soft decals out of the AO depth-normal prepass,
+    // otherwise their rectangles show up as AO outlines on the wall.
+    const ao = aoPass as unknown as {
+      _overrideVisibility: () => void;
+      _restoreVisibility: () => void;
+    };
+    const hiddenForAo: Mesh[] = [];
+    const baseOverride = ao._overrideVisibility.bind(aoPass);
+    const baseRestore = ao._restoreVisibility.bind(aoPass);
+    ao._overrideVisibility = () => {
+      baseOverride();
+      scene.traverse((object) => {
+        if (!(object instanceof Mesh) || !object.visible) return;
+        const material = object.material as Material;
+        if (material.transparent && !material.depthWrite) {
+          object.visible = false;
+          hiddenForAo.push(object);
+        }
+      });
+    };
+    ao._restoreVisibility = () => {
+      baseRestore();
+      hiddenForAo.forEach((object) => (object.visible = true));
+      hiddenForAo.length = 0;
+    };
+    composer.addPass(aoPass);
+  }
   let bokehPass: BokehPass | null = null;
   if (window.innerWidth >= 760) {
     bokehPass = new BokehPass(scene, viewCamera, {
@@ -186,6 +241,8 @@ export async function createMomentsScene(
     composer.addPass(bokehPass);
   }
   composer.addPass(new OutputPass());
+  // SMAA after tone mapping cleans edges MSAA misses (alpha-tested text, AO/bokeh output).
+  composer.addPass(new SMAAPass());
 
   function setPhase(next: ScenePhase) {
     if (phase === next) return;
@@ -399,6 +456,12 @@ export async function createMomentsScene(
     lastFrame = now;
     const time = now / 1000;
 
+    lights.followX(viewCamera.position.x);
+    for (const card of cards) {
+      const gap = Math.abs(card.group.position.z - card.target.z) +
+        Math.abs(card.group.position.x - card.target.x) * 0.2;
+      card.contact.material.opacity = 0.55 * clamp(1 - gap / 0.3, 0, 1);
+    }
     for (const { object, base, phase: speed } of animatedObjects) {
       object.position.y = base.y + Math.sin(time * speed) * 0.006;
     }
@@ -545,8 +608,9 @@ export async function createMomentsScene(
       });
       loadedTextures.forEach((texture) => texture.dispose());
       grain.dispose();
-      wallTexture.dispose();
-      woodTexture.dispose();
+      Object.values(wallTexture).forEach((texture) => texture.dispose());
+      Object.values(woodTexture).forEach((texture) => texture.dispose());
+      composerTarget.dispose();
       environment.dispose();
       composer.dispose();
       renderer.dispose();
@@ -573,14 +637,22 @@ async function buildCamera(
       if (!(object instanceof Mesh)) return;
       object.castShadow = true;
       object.receiveShadow = true;
-      const materials = Array.isArray(object.material)
-        ? object.material
-        : [object.material];
+      // GLTFLoader yields MeshStandardMaterial; upgrade lacquered/glass parts so clearcoat applies.
+      const upgraded = (Array.isArray(object.material) ? object.material : [object.material]).map(
+        (material: Material) =>
+          material instanceof MeshStandardMaterial &&
+          !(material instanceof MeshPhysicalMaterial) &&
+          /Shell|housing|grip|Glass|optic|Flash/i.test(material.name)
+            ? toPhysical(material)
+            : material,
+      );
+      object.material = Array.isArray(object.material) ? upgraded : upgraded[0];
+      const materials = upgraded;
       for (const material of materials) {
         if (material instanceof MeshStandardMaterial) {
           if (/Shell|housing|grip|strap/i.test(material.name)) {
-            material.bumpMap = grain;
-            material.bumpScale = 0.00135;
+            material.normalMap = grain;
+            material.normalScale.set(0.12, 0.12);
             material.roughness = Math.max(0.31, material.roughness);
             if (material instanceof MeshPhysicalMaterial) {
               material.clearcoat = /Shell|housing|grip/i.test(material.name)
@@ -590,7 +662,7 @@ async function buildCamera(
             }
           }
           if (/Glass|optic/i.test(material.name)) {
-            material.envMapIntensity = 3.1;
+            material.envMapIntensity = 1.7;
             material.roughness = Math.min(0.11, material.roughness);
             if (material instanceof MeshPhysicalMaterial) {
               material.clearcoat = 1;
@@ -598,14 +670,14 @@ async function buildCamera(
             }
           }
           if (/Metal|nickel/i.test(material.name)) {
-            material.envMapIntensity = 2.7;
+            material.envMapIntensity = 1.4;
             material.roughness = Math.min(0.2, material.roughness);
           }
           if (/Flash/i.test(material.name)) {
             material.color.offsetHSL(0, -0.05, 0.18);
             material.emissive.set("#fff4df");
             material.emissiveIntensity = 0.18;
-            material.envMapIntensity = 2.4;
+            material.envMapIntensity = 1.2;
           }
           material.needsUpdate = true;
         }
@@ -618,8 +690,7 @@ async function buildCamera(
         color: "#c9b59e",
         roughness: 0.55,
         metalness: 0.04,
-        bumpMap: grain,
-        bumpScale: 0.004,
+        normalMap: grain,
       }),
     );
     pedestalTop.position.set(0, -1.59, -0.08);
@@ -632,8 +703,7 @@ async function buildCamera(
       new MeshStandardMaterial({
         color: "#dfcfbe",
         roughness: 0.74,
-        bumpMap: grain,
-        bumpScale: 0.003,
+        normalMap: grain,
       }),
     );
     pedestalFace.position.set(0, -1.82, -0.12);
@@ -676,21 +746,46 @@ function createHeroHit(cameraActor: Group) {
   return hit;
 }
 
+type RoomMaps = { map: Texture; normalMap: Texture; roughnessMap: Texture };
+
+function loadRoomTexture(
+  url: string,
+  color: boolean,
+  repeatX: number,
+  repeatY: number,
+  anisotropy: number,
+) {
+  const texture = new TextureLoader().load(url);
+  // Only albedo is sRGB; normal/roughness stay linear data.
+  if (color) texture.colorSpace = SRGBColorSpace;
+  texture.wrapS = texture.wrapT = RepeatWrapping;
+  texture.repeat.set(repeatX, repeatY);
+  texture.anisotropy = anisotropy;
+  return texture;
+}
+
+function toPhysical(source: MeshStandardMaterial) {
+  const physical = new MeshPhysicalMaterial();
+  MeshStandardMaterial.prototype.copy.call(physical, source);
+  physical.defines = { STANDARD: "", PHYSICAL: "" };
+  source.dispose();
+  return physical;
+}
+
 function buildRoom(
   scene: Scene,
-  wallTexture: Texture,
-  woodTexture: Texture,
+  wallTexture: RoomMaps,
+  woodTexture: RoomMaps,
 ) {
   const entryProps = new Group();
   scene.add(entryProps);
   const wall = new Mesh(
     new PlaneGeometry(80, 16),
     new MeshStandardMaterial({
-      color: "#dbcbbd",
-      map: wallTexture,
-      roughness: 0.94,
-      bumpMap: wallTexture,
-      bumpScale: 0.012,
+      color: "#f4ebe4",
+      ...wallTexture,
+      roughness: 1,
+      normalScale: new Vector2(0.22, 0.22),
     }),
   );
   wall.position.set(20, 2.2, -2.75);
@@ -700,11 +795,10 @@ function buildRoom(
   const floor = new Mesh(
     new PlaneGeometry(80, 34),
     new MeshStandardMaterial({
-      color: "#c7b39d",
-      map: woodTexture,
-      roughness: 0.71,
-      bumpMap: woodTexture,
-      bumpScale: 0.008,
+      color: "#ffffff",
+      ...woodTexture,
+      roughness: 1,
+      normalScale: new Vector2(0.5, 0.5),
     }),
   );
   floor.rotation.x = -Math.PI / 2;
@@ -809,7 +903,7 @@ function buildRoom(
   const bloomColors = ["#f4c0c5", "#f2d39e", "#d2a5b6"];
   for (let index = 0; index < 7; index++) {
     const stem = new Mesh(
-      new CylinderGeometry(0.009, 0.012, 1.05 + (index % 3) * 0.12, 6),
+      new CylinderGeometry(0.009, 0.012, 1.05 + (index % 3) * 0.12, 20),
       new MeshStandardMaterial({ color: "#718c6b", roughness: 0.88 }),
     );
     stem.position.set(
@@ -862,20 +956,25 @@ function buildRoom(
 }
 
 function buildLights(scene: Scene) {
-  const hemi = new HemisphereLight("#fff8ef", "#806b5c", 0.86);
+  const hemi = new HemisphereLight("#fffaf4", "#d9cabd", 0.55);
   scene.add(hemi);
 
-  const daylight = new DirectionalLight("#fff0da", 2.9);
+  const daylight = new DirectionalLight("#fff6ea", 2.6);
   daylight.position.set(-4.7, 5.8, 5.4);
   daylight.target.position.set(0.6, -0.4, -0.8);
   daylight.castShadow = true;
   daylight.shadow.mapSize.set(2048, 2048);
   daylight.shadow.bias = -0.00012;
   daylight.shadow.normalBias = 0.024;
-  daylight.shadow.camera.left = -7;
-  daylight.shadow.camera.right = 7;
-  daylight.shadow.camera.top = 7;
-  daylight.shadow.camera.bottom = -5;
+  daylight.shadow.radius = 3;
+  daylight.shadow.blurSamples = 16;
+  // Tight frustum that follows the view camera along the wall (see followX).
+  daylight.shadow.camera.left = -6;
+  daylight.shadow.camera.right = 6;
+  daylight.shadow.camera.top = 5;
+  daylight.shadow.camera.bottom = -4.5;
+  daylight.shadow.camera.near = 1;
+  daylight.shadow.camera.far = 20;
   scene.add(daylight, daylight.target);
 
   const key = new SpotLight("#fff2dc", 30, 26, Math.PI / 5, 0.88, 1.4);
@@ -886,10 +985,11 @@ function buildLights(scene: Scene) {
   key.shadow.bias = -0.0001;
   key.shadow.normalBias = 0.028;
   key.shadow.camera.near = 0.5;
-  key.shadow.camera.far = 22;
+  key.shadow.camera.far = 16;
+  key.shadow.radius = 4;
   scene.add(key, key.target);
 
-  const wallWash = new SpotLight("#f8ded5", 20, 30, Math.PI / 4, 0.92, 1.2);
+  const wallWash = new SpotLight("#fff1ea", 9, 30, Math.PI / 4, 0.92, 1.2);
   wallWash.position.set(7.8, 7, 5);
   wallWash.target.position.set(8.5, 0.5, -2.7);
   scene.add(wallWash, wallWash.target);
@@ -902,7 +1002,15 @@ function buildLights(scene: Scene) {
   flash.target.position.set(0, -0.8, 5);
   scene.add(flash, flash.target);
 
-  return { key, wallWash, flash };
+  const daylightBase = daylight.position.clone();
+  const daylightTargetBase = daylight.target.position.clone();
+  function followX(x: number) {
+    const offset = Math.max(0, x);
+    daylight.position.set(daylightBase.x + offset, daylightBase.y, daylightBase.z);
+    daylight.target.position.set(daylightTargetBase.x + offset, daylightTargetBase.y, daylightTargetBase.z);
+  }
+
+  return { key, wallWash, flash, followX };
 }
 
 function createCard(
@@ -921,7 +1029,8 @@ function createCard(
   const target = new Vector3(
     4.34 + column * 1.66 + bay * 9.25 + jitterX,
     -1.12 + row * 1.54 + jitterY,
-    -2.46 + (index % 4) * 0.018,
+    // Pinned ~6cm off the plaster so the card casts a short, real shadow.
+    -2.665 + (index % 4) * 0.006,
   );
   const targetRotation = [-0.052, 0.022, 0.061, -0.031, 0.012][index % 5];
   const targetScale = [1, 0.86, 0.96, 0.81, 1.04][index % 5];
@@ -943,9 +1052,13 @@ function createCard(
   group.add(paper);
 
   const photoTexture = createPhotoTexture(item);
-  const photoMaterial = new MeshBasicMaterial({
+  // Lit, paper-like print so room lights and shadows land on it.
+  const photoMaterial = new MeshStandardMaterial({
     map: photoTexture,
-    color: "#e4d9d3",
+    // ~80% albedo like a real print, so a well-lit wall doesn't wash it out.
+    color: "#d6d0cb",
+    roughness: 0.6,
+    metalness: 0,
   });
   const photo = new Mesh(new PlaneGeometry(1.16, 1.5), photoMaterial);
   photo.position.set(0, 0.07, 0.027);
@@ -970,13 +1083,16 @@ function createCard(
   const captionTexture = createCaptionTexture(item.caption);
   const caption = new Mesh(
     new PlaneGeometry(1.12, 0.22),
-    new MeshBasicMaterial({
+    new MeshStandardMaterial({
       map: captionTexture,
       transparent: true,
-      toneMapped: false,
+      alphaTest: 0.02,
+      roughness: 0.85,
+      metalness: 0,
     }),
   );
   caption.position.set(0, -0.72, 0.03);
+  caption.receiveShadow = true;
   group.add(caption);
 
   const pin = new Mesh(
@@ -1004,7 +1120,22 @@ function createCard(
   hit.position.z = 0.08;
   group.add(hit);
 
-  return { item, group, hit, target, targetScale, targetRotation };
+  // Soft ambient-contact shadow just behind the card, faded in only once it rests on the wall.
+  const contact = new Mesh(
+    new PlaneGeometry(1.62, 2.1),
+    new MeshBasicMaterial({
+      map: getCardContactTexture(),
+      color: "#3c2f2a",
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }),
+  );
+  contact.position.set(0.03, -0.05, -0.075);
+  contact.renderOrder = -1;
+  group.add(contact);
+
+  return { item, group, hit, target, targetScale, targetRotation, contact };
 }
 
 function createSignTexture() {
@@ -1097,71 +1228,22 @@ function createCaptionTexture(caption: string) {
   return texture;
 }
 
-function createPlasterTexture() {
+let cardContactTexture: CanvasTexture | null = null;
+function getCardContactTexture() {
+  if (cardContactTexture) return cardContactTexture;
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 512;
+  canvas.width = 256;
+  canvas.height = 332;
   const context = canvas.getContext("2d");
-  if (!context) return new CanvasTexture(canvas);
-  const image = context.createImageData(canvas.width, canvas.height);
-  let seed = 194;
-  for (let index = 0; index < image.data.length; index += 4) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const value = 224 + (seed % 18);
-    image.data[index] = value;
-    image.data[index + 1] = value - 5;
-    image.data[index + 2] = value - 12;
-    image.data[index + 3] = 255;
-  }
-  context.putImageData(image, 0, 0);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  texture.wrapS = texture.wrapT = RepeatWrapping;
-  texture.repeat.set(12, 5);
-  return texture;
-}
-
-function createWoodTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 512;
-  const context = canvas.getContext("2d");
-  if (!context) return new CanvasTexture(canvas);
-  context.fillStyle = "#b99c80";
-  context.fillRect(0, 0, 512, 512);
-  for (let index = 0; index < 90; index++) {
-    const y = (index * 37) % 512;
-    context.strokeStyle = index % 3 ? "rgba(82,55,38,.08)" : "rgba(255,238,214,.12)";
-    context.lineWidth = 1 + (index % 3);
+  if (context) {
+    context.filter = "blur(10px)";
+    context.fillStyle = "rgba(0,0,0,.9)";
     context.beginPath();
-    context.moveTo(0, y);
-    context.bezierCurveTo(160, y + 16, 310, y - 12, 512, y + 5);
-    context.stroke();
+    context.roundRect(26, 26, 204, 280, 8);
+    context.fill();
   }
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  texture.wrapS = texture.wrapT = RepeatWrapping;
-  texture.repeat.set(8, 8);
-  return texture;
-}
-
-function createGrainTexture() {
-  const size = 128;
-  const data = new Uint8Array(size * size * 4);
-  let seed = 37;
-  for (let index = 0; index < data.length; index += 4) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const value = 112 + (seed % 32);
-    data[index] = value;
-    data[index + 1] = value;
-    data[index + 2] = value;
-    data[index + 3] = 255;
-  }
-  const texture = new DataTexture(data, size, size, RGBAFormat);
-  texture.wrapS = texture.wrapT = RepeatWrapping;
-  texture.repeat.set(8, 8);
-  texture.needsUpdate = true;
-  return texture;
+  cardContactTexture = new CanvasTexture(canvas);
+  return cardContactTexture;
 }
 
 function createContactShadowTexture() {

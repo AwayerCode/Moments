@@ -19,6 +19,7 @@ glass=mat('Glass | coated optic',(.016,.035,.05),.08,.22)
 flash=mat('Flash | translucent prism',(.74,.77,.76),.19,.15)
 white=mat('Lettering | warm white',(.92,.83,.73),.6)
 strapmat=mat('Strap | woven rose',(.38,.13,.17),.9)
+SHARP_DEG=30
 def mesh(name,vs,fs,m):
  me=bpy.data.meshes.new(name);me.from_pydata([pos(v) for v in vs],[],fs);me.update()
  uv=me.uv_layers.new(name='Surface grain coordinates')
@@ -26,21 +27,44 @@ def mesh(name,vs,fs,m):
   v=vs[loop.vertex_index];uv.data[loop.index].uv=(v[0]*.25,v[1]*.25)
  ob=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(ob);ob.data.materials.append(m)
  for p in me.polygons:p.use_smooth=True
+ # Hard edges where the surface turns more than ~30deg (glTF export splits normals there),
+ # so caps, chamfers and lips stay crisp instead of smearing one smooth normal over a corner.
+ me.set_sharp_from_angle(angle=math.radians(SHARP_DEG))
  return ob
 # Continuous rounded superellipse cross-sections: corners and depth are modeled, not overlaid boxes.
-def shell(name,w,h,profiles,m,c=(0,.35,0),n=3.7):
+def refine(profiles,steps=4):
+ """Catmull-Rom resample of the (z,scale) profile: 4-5 coarse rings become ~16-20 smooth ones."""
+ if len(profiles)<3:return list(profiles)
+ P=[profiles[0]]+list(profiles)+[profiles[-1]];out=[]
+ for k in range(1,len(P)-2):
+  p0,p1,p2,p3=P[k-1],P[k],P[k+1],P[k+2]
+  for s in range(steps):
+   t=s/steps;t2=t*t;t3=t2*t
+   out.append(tuple(.5*((2*p1[d])+(-p0[d]+p2[d])*t+(2*p0[d]-5*p1[d]+4*p2[d]-p3[d])*t2+(-p0[d]+3*p1[d]-3*p2[d]+p3[d])*t3) for d in (0,1)))
+ out.append(profiles[-1]);return out
+# Continuous rounded superellipse cross-sections: corners and depth are modeled, not overlaid boxes.
+def shell(name,w,h,profiles,m,c=(0,.35,0),n=3.7,chamfer=.014):
  vs=[];N=96
- for z,scale in profiles:
+ rings=refine(profiles)
+ if chamfer and len(rings)>2:
+  # Small 45deg chamfer ring at each open end so the cap edge catches a highlight.
+  (z0,s0),(z1,s1)=rings[0],rings[-1];ds=2*chamfer/min(w,h)
+  rings=[(z0,s0-ds),(z0+chamfer,s0)]+rings[1:-1]+[(z1-chamfer,s1),(z1,s1-ds)]
+ for z,scale in rings:
   for i in range(N):
    a=2*math.pi*i/N;co=math.cos(a);si=math.sin(a)
    x=w*.5*math.copysign(abs(co)**(2/n),co)*scale
    y=h*.5*math.copysign(abs(si)**(2/n),si)*scale
-   # Slight asymmetric grip fullness integrated into the shell contour.
    vs.append((c[0]+x,c[1]+y,c[2]+z))
- fs=[]
- for j in range(len(profiles)-1):
+ fs=[];R=len(rings)
+ for j in range(R-1):
   for i in range(N):fs.append((j*N+i,j*N+(i+1)%N,(j+1)*N+(i+1)%N,(j+1)*N+i))
- fs.extend([tuple(range(N-1,-1,-1)),tuple((len(profiles)-1)*N+i for i in range(N))])
+ # Triangle-fan caps around a centre vertex instead of one 96-sided n-gon.
+ vs.append((c[0],c[1],c[2]+rings[0][0]));a0=len(vs)-1
+ vs.append((c[0],c[1],c[2]+rings[-1][0]));a1=len(vs)-1
+ for i in range(N):
+  fs.append(((i+1)%N,i,a0))
+  fs.append(((R-1)*N+i,(R-1)*N+(i+1)%N,a1))
  return mesh(name,vs,fs,m)
 shell('Rear housing',2.85,3.05,[(-.48,.78),(-.45,.88),(-.36,.97),(-.22,1),(.04,1)],pink)
 shell('Precision shell seam',2.85,3.05,[(.041,1),(.055,1)],edge)
