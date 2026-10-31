@@ -139,7 +139,7 @@ export function MomentScene() {
   }, []);
 
   return (
-    <main className="moments-scene">
+    <main className="moments-scene" data-phase={phase}>
       <canvas
         ref={canvasRef}
         className="moments-canvas"
@@ -169,7 +169,7 @@ export function MomentScene() {
         </div>
       ) : null}
 
-      {phase === "printing" || phase === "transition" ? (
+      {phase === "printing" ? (
         <div className="scene-process" role="status">
           <span />
           正在显影
@@ -181,7 +181,7 @@ export function MomentScene() {
           <button type="button" onClick={() => sceneRef.current?.travel(-1)} aria-label="向左边看">
             ‹
           </button>
-          <p>拖动、滚轮或方向键看展</p>
+          <p>左右拖动看展 · 滑过左缘回到相机</p>
           <button type="button" onClick={() => sceneRef.current?.travel(1)} aria-label="向右边看">
             ›
           </button>

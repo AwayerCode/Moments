@@ -48,10 +48,8 @@ canvas:focus-visible {
   z-index:1;
   pointer-events:none;
   background:
-    linear-gradient(90deg,rgba(72,50,43,.09),transparent 9%,transparent 91%,rgba(72,50,43,.07)),
-    radial-gradient(circle at 9% 18%,rgb(255 246 226 / 32%),transparent 31%),
-    radial-gradient(ellipse at 50% 42%,transparent 45%,rgba(72,51,43,.14) 118%);
-  mix-blend-mode:multiply;
+    radial-gradient(circle at 50% 28%,rgb(255 250 240 / 18%),transparent 36%),
+    radial-gradient(ellipse at 50% 58%,transparent 58%,rgba(72,51,43,.1) 118%);
 }
 
 .moments-canvas {
@@ -63,6 +61,11 @@ canvas:focus-visible {
   outline:none;
   touch-action:none;
   cursor:grab;
+  transition:opacity .18s ease;
+}
+
+.moments-canvas.is-fading {
+  opacity:0;
 }
 
 .scene-loading {
@@ -326,6 +329,9 @@ canvas:focus-visible {
   .gallery-hint p {
     font-size:11px;
     letter-spacing:.04em;
+    white-space:normal;
+    text-align:center;
+    max-width:52vw;
   }
 
   .inspect-caption {
