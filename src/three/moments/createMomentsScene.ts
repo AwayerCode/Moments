@@ -6,11 +6,10 @@ import {
   Material,
   BoxGeometry,
   CanvasTexture,
-  Color,
-  CylinderGeometry,
   DirectionalLight,
   Group,
   HemisphereLight,
+  LinearFilter,
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
@@ -40,6 +39,16 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import type { MomentItem } from "../../lib/api.ts";
+import {
+  LAYOUT,
+  TIMING,
+  cardSlot,
+  galleryMaxX as maxGalleryX,
+  galleryStartX,
+  rubberBandPan,
+  settlePanX,
+  shouldReturnToCamera,
+} from "./galleryLayout.ts";
 
 export type ScenePhase =
   | "loading"
@@ -47,7 +56,8 @@ export type ScenePhase =
   | "printing"
   | "transition"
   | "gallery"
-  | "inspect";
+  | "inspect"
+  | "returning";
 
 type Callbacks = {
   onPhase?: (phase: ScenePhase) => void;
@@ -78,10 +88,6 @@ type GalleryCard = {
 };
 
 const COLORS = {
-  blush: "#d88e98",
-  blushDeep: "#a95e6b",
-  cream: "#efe5d8",
-  plaster: "#e6d8ca",
   ink: "#5c4e4b",
   paper: "#fffaf0",
 };
@@ -92,9 +98,13 @@ const easeOut = (value: number) => 1 - (1 - value) ** 3;
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
+const ENTRY_POSITION = new Vector3(0, 0.36, 6.55);
+const ENTRY_TARGET = new Vector3(0, -0.16, 0);
+const CAMERA_REST = new Vector3(-0.05, -0.32, 0);
+
 /**
- * One renderer and one scene own the entire experience. The camera, printed
- * photograph, gallery and navigation camera all share world space.
+ * One renderer and one scene own the entire experience. Two camera poses
+ * share that world: a studio entry on the Instax, and a face-on wall.
  */
 export async function createMomentsScene(
   canvas: HTMLCanvasElement,
@@ -116,13 +126,14 @@ export async function createMomentsScene(
   renderer.shadowMap.enabled = true;
   // r18x: PCFShadowMap is the soft PCF path (PCFSoftShadowMap was removed); softness via shadow.radius.
   renderer.shadowMap.type = PCFShadowMap;
-  renderer.setClearColor("#f7f1ea");
+  renderer.setClearColor("#f4ebe3");
 
   const scene = new Scene();
-  scene.background = new Color("#f7f1ea");
+  const studioBackground = createStudioBackground();
+  scene.background = studioBackground;
   const viewCamera = new PerspectiveCamera(33, 1, 0.08, 80);
-  const desiredPosition = new Vector3(0, 0.45, 9.2);
-  const desiredTarget = new Vector3(0, 0.35, 0);
+  const desiredPosition = ENTRY_POSITION.clone();
+  const desiredTarget = ENTRY_TARGET.clone();
   const currentTarget = desiredTarget.clone();
   viewCamera.position.copy(desiredPosition);
   viewCamera.lookAt(currentTarget);
@@ -138,32 +149,23 @@ export async function createMomentsScene(
   const maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const grain = loadRoomTexture("/textures/grain_normal.jpg", false, 6, 6, maxAnisotropy);
   const wallTexture: RoomMaps = {
-    map: loadRoomTexture("/textures/plaster_albedo.jpg", true, 14, 2.8, maxAnisotropy),
-    normalMap: loadRoomTexture("/textures/plaster_normal.jpg", false, 14, 2.8, maxAnisotropy),
-    roughnessMap: loadRoomTexture("/textures/plaster_rough.jpg", false, 14, 2.8, maxAnisotropy),
-  };
-  const woodTexture: RoomMaps = {
-    map: loadRoomTexture("/textures/oak_albedo.jpg", true, 10, 4.25, maxAnisotropy),
-    normalMap: loadRoomTexture("/textures/oak_normal.jpg", false, 10, 4.25, maxAnisotropy),
-    roughnessMap: loadRoomTexture("/textures/oak_rough.jpg", false, 10, 4.25, maxAnisotropy),
+    map: loadRoomTexture("/textures/plaster_albedo.jpg", true, 10, 2.2, maxAnisotropy),
+    normalMap: loadRoomTexture("/textures/plaster_normal.jpg", false, 10, 2.2, maxAnisotropy),
+    roughnessMap: loadRoomTexture("/textures/plaster_rough.jpg", false, 10, 2.2, maxAnisotropy),
   };
   const loadedTextures = new Set<Texture>();
   const cards: GalleryCard[] = [];
-  const animatedObjects: Array<{
-    object: Mesh;
-    base: Vector3;
-    phase: number;
-  }> = [];
 
-  const { entryProps } = buildRoom(scene, wallTexture, woodTexture);
+  const galleryRoot = buildGalleryWall(scene, wallTexture);
+  galleryRoot.visible = false;
   const lights = buildLights(scene);
   const cameraActor = await buildCamera(scene, grain, callbacks.onError);
   const heroHit = createHeroHit(cameraActor);
   scene.add(heroHit);
 
   let phase: ScenePhase = "loading";
-  let sequenceTime = 0;
-  let targetGalleryX = 5.7;
+  let sequenceStartedAt = 0;
+  let targetGalleryX = galleryStartX();
   let inspected: GalleryCard | null = null;
   let reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let disposed = false;
@@ -172,21 +174,24 @@ export async function createMomentsScene(
   let pointerDownX = 0;
   let pointerDownY = 0;
   let previousPointerX = 0;
+  let enteredGalleryOnce = false;
   let pointer = new Vector2(99, 99);
   const raycaster = new Raycaster();
   const pointerNdc = new Vector2();
   const startCardPosition = new Vector3(0, -0.32, 0.4);
-  const ejectedCardPosition = new Vector3(0, -1.62, 0.82);
-  const heroCameraPosition = new Vector3(0, 0.45, 9.2);
-  const heroCameraTarget = new Vector3(0, 0.35, 0);
+  const ejectedCardPosition = new Vector3(0, -1.48, 0.86);
   const cameraFacing = new Vector2();
+  const galleryFrom = new Vector3();
+  const galleryFromTarget = new Vector3();
 
   addGalleryItems(initialItems);
 
   function addGalleryItems(items: MomentItem[]) {
     const startIndex = cards.length;
     items.forEach((item, offset) => {
-      cards.push(createCard(item, startIndex + offset, scene, loadedTextures));
+      const card = createCard(item, startIndex + offset, scene, loadedTextures);
+      card.group.visible = phase === "gallery" || phase === "inspect" || phase === "transition";
+      cards.push(card);
     });
   }
 
@@ -234,7 +239,7 @@ export async function createMomentsScene(
   let bokehPass: BokehPass | null = null;
   if (window.innerWidth >= 760) {
     bokehPass = new BokehPass(scene, viewCamera, {
-      focus: 8.2,
+      focus: 6.8,
       aperture: 0.000055,
       maxblur: 0.004,
     });
@@ -250,12 +255,42 @@ export async function createMomentsScene(
     callbacks.onPhase?.(next);
   }
 
+  function galleryPose(x: number) {
+    const mobile = viewCamera.aspect < 0.72;
+    const y = mobile ? 0.52 : 0.7;
+    const z = mobile ? 8.4 : 7.15;
+    return {
+      position: new Vector3(x, y, z),
+      target: new Vector3(x, y - 0.06, LAYOUT.wallZ),
+    };
+  }
+
+  function inspectPose(card: GalleryCard) {
+    return {
+      position: new Vector3(card.target.x, card.target.y, card.target.z + 2.38),
+      target: card.target.clone(),
+    };
+  }
+
+  function setCardsVisible(visible: boolean) {
+    cards.forEach((card) => {
+      card.group.visible = visible;
+    });
+  }
+
+  function restCards() {
+    cards.forEach((card) => {
+      card.group.visible = true;
+      card.group.position.copy(card.target);
+      card.group.rotation.set(0, 0, card.targetRotation);
+      card.group.scale.setScalar(card.targetScale);
+    });
+  }
+
   function prepareHeroCard() {
     const cover = cards[0];
+    setCardsVisible(false);
     if (!cover) return;
-    cards.forEach((card) => {
-      card.group.visible = false;
-    });
     cover.group.position.copy(startCardPosition);
     cover.group.rotation.set(0, 0, 0);
     cover.group.scale.setScalar(0.94);
@@ -264,59 +299,141 @@ export async function createMomentsScene(
 
   prepareHeroCard();
 
+  function startSequence() {
+    sequenceStartedAt = performance.now();
+  }
+
+  function sequenceElapsed() {
+    return (performance.now() - sequenceStartedAt) / 1000;
+  }
+
+  function fadeCanvas(onHidden: () => void) {
+    canvas.classList.add("is-fading");
+    window.setTimeout(() => {
+      onHidden();
+      window.setTimeout(() => {
+        canvas.classList.remove("is-fading");
+      }, 30);
+    }, TIMING.reducedFade * 1000);
+  }
+
   function pressShutter() {
     if (phase !== "camera") return;
     cameraActor.visible = true;
-    cameraActor.position.set(-0.05, -0.32, 0);
-    entryProps.visible = true;
-    entryProps.position.x = 0;
+    cameraActor.position.copy(CAMERA_REST);
+    if (enteredGalleryOnce) {
+      beginEnterGallery(true);
+      return;
+    }
     const cover = cards[0];
     if (cover) cover.group.visible = true;
-    sequenceTime = 0;
+    startSequence();
     setPhase("printing");
     if (reducedMotion) {
-      finishSequence();
+      fadeCanvas(() => finishEnterGallery());
     }
   }
 
-  function finishSequence() {
-    const cover = cards[0];
-    cards.forEach((card) => {
-      card.group.visible = true;
-    });
-    if (cover) {
-      cover.group.position.copy(cover.target);
-      cover.group.rotation.z = cover.targetRotation;
-      cover.group.scale.setScalar(cover.targetScale);
+  function beginEnterGallery(short: boolean) {
+    dragging = false;
+    galleryRoot.visible = true;
+    if (short) restCards();
+    else {
+      cards.slice(1).forEach((card) => {
+        card.group.visible = true;
+        card.group.position.copy(card.target);
+        card.group.rotation.set(0, 0, card.targetRotation);
+        card.group.scale.setScalar(card.targetScale);
+      });
     }
-    viewCamera.position.set(3.4, 0.9, 8.6);
-    currentTarget.set(5.2, 0.9, -2.1);
+    targetGalleryX = settlePanX(targetGalleryX, galleryMinX(), galleryLimitX());
+    const from = viewCamera.position.clone();
+    const fromTarget = currentTarget.clone();
+    galleryFrom.copy(from);
+    galleryFromTarget.copy(fromTarget);
+    startSequence();
+    setPhase("transition");
+    if (reducedMotion) {
+      fadeCanvas(() => finishEnterGallery());
+    }
+  }
+
+  function finishEnterGallery() {
+    restCards();
+    const pose = galleryPose(targetGalleryX);
+    viewCamera.position.copy(pose.position);
+    currentTarget.copy(pose.target);
+    desiredPosition.copy(pose.position);
+    desiredTarget.copy(pose.target);
     viewCamera.lookAt(currentTarget);
     cameraActor.visible = false;
-    entryProps.visible = false;
-    targetGalleryX = (cover?.target.x ?? 5.2) + 0.62;
+    heroHit.visible = false;
+    galleryRoot.visible = true;
+    enteredGalleryOnce = true;
     setPhase("gallery");
   }
 
-  function travel(direction: number) {
-    if (phase === "gallery") {
-      targetGalleryX = clamp(
-        targetGalleryX + direction * 1.8,
-        4.5,
-        galleryMaxX(),
-      );
-      requestMoreIfNeeded();
+  function beginReturnToCamera() {
+    if (phase !== "gallery") return;
+    dragging = false;
+    inspected = null;
+    callbacks.onInspect?.(null);
+    cameraActor.visible = true;
+    cameraActor.position.copy(CAMERA_REST);
+    heroHit.visible = true;
+    galleryFrom.copy(viewCamera.position);
+    galleryFromTarget.copy(currentTarget);
+    startSequence();
+    setPhase("returning");
+    if (reducedMotion) {
+      fadeCanvas(() => finishReturnToCamera());
     }
   }
 
-  function galleryMaxX() {
-    return cards.length
-      ? Math.max(5.2, cards[cards.length - 1].target.x + 0.8)
-      : 5.2;
+  function finishReturnToCamera() {
+    galleryRoot.visible = false;
+    setCardsVisible(false);
+    cameraActor.visible = true;
+    heroHit.visible = true;
+    cameraActor.position.copy(CAMERA_REST);
+    viewCamera.position.copy(ENTRY_POSITION);
+    currentTarget.copy(ENTRY_TARGET);
+    desiredPosition.copy(ENTRY_POSITION);
+    desiredTarget.copy(ENTRY_TARGET);
+    viewCamera.lookAt(currentTarget);
+    targetGalleryX = galleryStartX();
+    setPhase("camera");
+  }
+
+  function galleryMinX() {
+    return galleryStartX();
+  }
+
+  function galleryLimitX() {
+    const last = cards[cards.length - 1];
+    return last ? maxGalleryX(last.target.x) : galleryStartX();
+  }
+
+  function applyPan(delta: number, commitReturn: boolean) {
+    if (phase !== "gallery") return;
+    targetGalleryX = rubberBandPan(
+      targetGalleryX,
+      delta,
+      galleryMinX(),
+      galleryLimitX(),
+    );
+    requestMoreIfNeeded();
+    if (commitReturn && shouldReturnToCamera(targetGalleryX, galleryMinX())) {
+      beginReturnToCamera();
+    }
+  }
+
+  function travel(direction: number) {
+    applyPan(direction * 1.8, true);
   }
 
   function requestMoreIfNeeded() {
-    if (targetGalleryX > galleryMaxX() - 3.2) callbacks.onNearEnd?.();
+    if (targetGalleryX > galleryLimitX() - 3.2) callbacks.onNearEnd?.();
   }
 
   function closeInspect() {
@@ -327,7 +444,7 @@ export async function createMomentsScene(
   }
 
   function onPointerDown(event: PointerEvent) {
-    if (phase === "gallery" || phase === "inspect") {
+    if (phase === "gallery") {
       dragging = true;
       dragged = false;
       pointerDownX = event.clientX;
@@ -350,17 +467,12 @@ export async function createMomentsScene(
       if (Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY) > 7) {
         dragged = true;
       }
-      targetGalleryX = clamp(
-        targetGalleryX - dx * 0.012,
-        4.5,
-        galleryMaxX(),
-      );
-      requestMoreIfNeeded();
+      applyPan(-dx * 0.012, false);
       previousPointerX = event.clientX;
       canvas.style.cursor = "grabbing";
       return;
     }
-    if (phase === "inspect") {
+    if (phase === "inspect" || phase === "transition" || phase === "returning" || phase === "printing") {
       canvas.style.cursor = "default";
       return;
     }
@@ -383,14 +495,20 @@ export async function createMomentsScene(
     if (canvas.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
     }
-    if (dragging && phase === "gallery" && !dragged) {
-      updateRaycaster(event);
-      const card = pickCard();
-      if (card) {
-        inspected = card;
-        targetGalleryX = card.target.x;
-        callbacks.onInspect?.(card.item);
-        setPhase("inspect");
+    if (dragging && phase === "gallery") {
+      if (!dragged) {
+        updateRaycaster(event);
+        const card = pickCard();
+        if (card) {
+          inspected = card;
+          targetGalleryX = card.target.x;
+          callbacks.onInspect?.(card.item);
+          setPhase("inspect");
+        }
+      } else if (shouldReturnToCamera(targetGalleryX, galleryMinX())) {
+        beginReturnToCamera();
+      } else {
+        targetGalleryX = settlePanX(targetGalleryX, galleryMinX(), galleryLimitX());
       }
     }
     dragging = false;
@@ -400,12 +518,7 @@ export async function createMomentsScene(
   function onWheel(event: WheelEvent) {
     if (phase !== "gallery") return;
     event.preventDefault();
-    targetGalleryX = clamp(
-      targetGalleryX + Math.sign(event.deltaY) * 1.35,
-      4.5,
-      galleryMaxX(),
-    );
-    requestMoreIfNeeded();
+    applyPan(Math.sign(event.deltaY) * 1.35, true);
   }
 
   function updateRaycaster(event: PointerEvent) {
@@ -452,85 +565,82 @@ export async function createMomentsScene(
   function animate(now: number) {
     if (disposed) return;
     frameHandle = window.requestAnimationFrame(animate);
-    const delta = Math.min(0.05, (now - lastFrame) / 1000);
+    const rawDelta = (now - lastFrame) / 1000;
     lastFrame = now;
+    const delta = Math.min(0.05, rawDelta);
     const time = now / 1000;
 
     lights.followX(viewCamera.position.x);
     for (const card of cards) {
-      const gap = Math.abs(card.group.position.z - card.target.z) +
+      const gap =
+        Math.abs(card.group.position.z - card.target.z) +
         Math.abs(card.group.position.x - card.target.x) * 0.2;
       card.contact.material.opacity = 0.55 * clamp(1 - gap / 0.3, 0, 1);
     }
-    for (const { object, base, phase: speed } of animatedObjects) {
-      object.position.y = base.y + Math.sin(time * speed) * 0.006;
-    }
 
-    if (phase === "printing" || phase === "transition") {
-      sequenceTime += delta;
+    if (phase === "printing") {
+      const sequenceTime = sequenceElapsed();
       const cover = cards[0];
       if (cover) {
-        if (sequenceTime <= 1.65) {
-          const progress = easeOut(clamp((sequenceTime - 0.16) / 1.28, 0, 1));
-          cover.group.position.lerpVectors(
-            startCardPosition,
-            ejectedCardPosition,
-            progress,
-          );
-          cover.group.rotation.y = -0.07 * (1 - progress);
-          cover.group.rotation.z = Math.sin(progress * Math.PI * 2) * 0.018;
-          cover.group.scale.setScalar(0.94 + progress * 0.06);
-        } else {
-          if (phase !== "transition") setPhase("transition");
-          cards.slice(1).forEach((card) => {
-            card.group.visible = true;
-          });
-          const progress = easeInOut(clamp((sequenceTime - 1.65) / 1.55, 0, 1));
-          cover.group.position.lerpVectors(
-            ejectedCardPosition,
-            cover.target,
-            progress,
-          );
-          cover.group.position.y += Math.sin(progress * Math.PI) * 0.42;
-          cover.group.rotation.z =
-            Math.sin(progress * Math.PI) * -0.08 +
-            cover.targetRotation * easeOut(progress);
-          cover.group.rotation.y = -0.07 * (1 - easeOut(progress));
-          cover.group.scale.setScalar(
-            1 + (cover.targetScale - 1) * easeOut(progress),
-          );
-          cameraActor.position.x = -0.05 - 3.7 * easeInOut(progress);
-          entryProps.position.x = -4.2 * easeInOut(progress);
-          viewCamera.position.lerpVectors(
-            heroCameraPosition,
-            new Vector3(3.4, 0.9, 8.6),
-            easeInOut(progress),
-          );
-          currentTarget.lerpVectors(
-            heroCameraTarget,
-            new Vector3(5.2, 0.9, -2.1),
-            easeInOut(progress),
-          );
-          viewCamera.lookAt(currentTarget);
-          if (progress >= 1) finishSequence();
-        }
+        const progress = easeOut(clamp((sequenceTime - 0.08) / 0.78, 0, 1));
+        cover.group.position.lerpVectors(startCardPosition, ejectedCardPosition, progress);
+        cover.group.rotation.y = -0.07 * (1 - progress);
+        cover.group.rotation.z = Math.sin(progress * Math.PI * 2) * 0.018;
+        cover.group.scale.setScalar(0.94 + progress * 0.06);
       }
-      lights.flash.intensity = Math.max(
-        0,
-        80 - Math.max(0, sequenceTime - 0.04) * 300,
+      lights.flash.intensity = Math.max(0, 80 - Math.max(0, sequenceTime - 0.04) * 300);
+      if (sequenceTime >= TIMING.print) beginEnterGallery(false);
+    } else if (phase === "transition") {
+      const sequenceTime = sequenceElapsed();
+      const duration = enteredGalleryOnce ? TIMING.shortDolly : TIMING.firstDolly;
+      const progress = easeInOut(clamp(sequenceTime / duration, 0, 1));
+      const pose = galleryPose(targetGalleryX);
+      viewCamera.position.lerpVectors(galleryFrom, pose.position, progress);
+      currentTarget.lerpVectors(galleryFromTarget, pose.target, progress);
+      viewCamera.lookAt(currentTarget);
+      const cover = cards[0];
+      if (cover && !enteredGalleryOnce) {
+        cover.group.position.lerpVectors(ejectedCardPosition, cover.target, progress);
+        cover.group.position.y += Math.sin(progress * Math.PI) * 0.28;
+        cover.group.rotation.z =
+          Math.sin(progress * Math.PI) * -0.06 + cover.targetRotation * easeOut(progress);
+        cover.group.rotation.y = -0.07 * (1 - easeOut(progress));
+        cover.group.scale.setScalar(1 + (cover.targetScale - 1) * easeOut(progress));
+      }
+      cameraActor.position.x = CAMERA_REST.x - 2.4 * easeInOut(progress);
+      if (progress > 0.42) {
+        cameraActor.visible = false;
+        heroHit.visible = false;
+      }
+      if (progress >= 1) finishEnterGallery();
+    } else if (phase === "returning") {
+      const sequenceTime = sequenceElapsed();
+      const progress = easeInOut(clamp(sequenceTime / TIMING.returnDolly, 0, 1));
+      viewCamera.position.lerpVectors(galleryFrom, ENTRY_POSITION, progress);
+      currentTarget.lerpVectors(galleryFromTarget, ENTRY_TARGET, progress);
+      viewCamera.lookAt(currentTarget);
+      cameraActor.position.lerpVectors(
+        new Vector3(CAMERA_REST.x - 1.1, CAMERA_REST.y, CAMERA_REST.z),
+        CAMERA_REST,
+        easeOut(progress),
       );
+      if (progress > 0.7) {
+        galleryRoot.visible = false;
+        setCardsVisible(false);
+      }
+      if (progress >= 1) finishReturnToCamera();
     } else {
       lights.flash.intensity = Math.max(0, lights.flash.intensity - delta * 160);
     }
 
     if (phase === "camera") {
-      desiredPosition.copy(heroCameraPosition);
-      desiredTarget.copy(heroCameraTarget);
+      desiredPosition.copy(ENTRY_POSITION);
+      desiredTarget.copy(ENTRY_TARGET);
       const cameraBreath = Math.sin(time * 0.72) * 0.008;
       cameraActor.position.set(
-        -0.05 + cameraFacing.x * 0.035,
-        -0.32 + cameraFacing.y * -0.018 + cameraBreath,
-        0,
+        CAMERA_REST.x + cameraFacing.x * 0.035,
+        CAMERA_REST.y + cameraFacing.y * -0.018 + cameraBreath,
+        CAMERA_REST.z,
       );
       cameraActor.rotation.set(
         -0.012 + cameraFacing.y * 0.012,
@@ -538,20 +648,13 @@ export async function createMomentsScene(
         -0.01,
       );
     } else if (phase === "gallery") {
-      desiredPosition.set(
-        targetGalleryX - 1.75,
-        viewCamera.aspect < 0.72 ? 0.7 : 0.95,
-        viewCamera.aspect < 0.72 ? 10.1 : 8.65,
-      );
-      desiredTarget.set(targetGalleryX + 0.35, 0.78, -2.2);
+      const pose = galleryPose(targetGalleryX);
+      desiredPosition.copy(pose.position);
+      desiredTarget.copy(pose.target);
     } else if (phase === "inspect" && inspected) {
-      desiredPosition.set(
-        inspected.target.x + 0.16,
-        inspected.target.y + 0.05,
-        2.65,
-      );
-      desiredTarget.copy(inspected.target);
-      desiredTarget.z += 0.02;
+      const pose = inspectPose(inspected);
+      desiredPosition.copy(pose.position);
+      desiredTarget.copy(pose.target);
     }
 
     if (phase === "gallery" || phase === "inspect") {
@@ -564,8 +667,7 @@ export async function createMomentsScene(
     if (bokehPass) {
       const uniforms = bokehPass.materialBokeh.uniforms;
       if (uniforms.focus) {
-        uniforms.focus.value =
-          viewCamera.position.distanceTo(currentTarget);
+        uniforms.focus.value = viewCamera.position.distanceTo(currentTarget);
       }
     }
 
@@ -609,7 +711,7 @@ export async function createMomentsScene(
       loadedTextures.forEach((texture) => texture.dispose());
       grain.dispose();
       Object.values(wallTexture).forEach((texture) => texture.dispose());
-      Object.values(woodTexture).forEach((texture) => texture.dispose());
+      studioBackground.dispose();
       composerTarget.dispose();
       environment.dispose();
       composer.dispose();
@@ -627,7 +729,7 @@ async function buildCamera(
     const gltf = await new GLTFLoader().loadAsync("/models/sisi-camera.glb");
     const model = gltf.scene;
     const group = new Group();
-    group.position.set(-0.05, -0.32, 0);
+    group.position.copy(CAMERA_REST);
     group.rotation.set(-0.012, -0.07, -0.01);
     group.scale.setScalar(0.94);
     group.add(model);
@@ -684,46 +786,19 @@ async function buildCamera(
       }
     });
 
-    const pedestalTop = new Mesh(
-      new RoundedBoxGeometry(4.1, 0.16, 1.6, 5, 0.06),
-      new MeshStandardMaterial({
-        color: "#c9b59e",
-        roughness: 0.55,
-        metalness: 0.04,
-        normalMap: grain,
-      }),
-    );
-    pedestalTop.position.set(0, -1.59, -0.08);
-    pedestalTop.castShadow = true;
-    pedestalTop.receiveShadow = true;
-    scene.add(pedestalTop);
-
-    const pedestalFace = new Mesh(
-      new RoundedBoxGeometry(4.1, 0.3, 1.5, 5, 0.055),
-      new MeshStandardMaterial({
-        color: "#dfcfbe",
-        roughness: 0.74,
-        normalMap: grain,
-      }),
-    );
-    pedestalFace.position.set(0, -1.82, -0.12);
-    pedestalFace.castShadow = true;
-    pedestalFace.receiveShadow = true;
-    scene.add(pedestalFace);
-
     const contactShadow = new Mesh(
-      new PlaneGeometry(4.2, 1.25),
+      new PlaneGeometry(2.6, 1.15),
       new MeshBasicMaterial({
         map: createContactShadowTexture(),
         color: "#55483f",
         transparent: true,
-        opacity: 0.56,
+        opacity: 0.32,
         depthWrite: false,
       }),
     );
     contactShadow.rotation.x = -Math.PI / 2;
-    contactShadow.position.set(0, -1.505, 0.15);
-    scene.add(contactShadow);
+    contactShadow.position.set(0.04, -1.38, 0.18);
+    group.add(contactShadow);
 
     return group;
   } catch (error) {
@@ -772,203 +847,57 @@ function toPhysical(source: MeshStandardMaterial) {
   return physical;
 }
 
-function buildRoom(
-  scene: Scene,
-  wallTexture: RoomMaps,
-  woodTexture: RoomMaps,
-) {
-  const entryProps = new Group();
-  scene.add(entryProps);
+function createStudioBackground() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 16;
+  canvas.height = 512;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#f7f1ea");
+    gradient.addColorStop(0.46, "#f3e6dc");
+    gradient.addColorStop(1, "#e7d2c8");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearFilter;
+  return texture;
+}
+
+function buildGalleryWall(scene: Scene, wallTexture: RoomMaps) {
+  const root = new Group();
+  scene.add(root);
   const wall = new Mesh(
     new PlaneGeometry(80, 16),
     new MeshStandardMaterial({
-      color: "#f4ebe4",
+      color: "#ebe0d6",
       ...wallTexture,
       roughness: 1,
-      normalScale: new Vector2(0.22, 0.22),
+      normalScale: new Vector2(0.12, 0.12),
     }),
   );
-  wall.position.set(20, 2.2, -2.75);
+  wall.position.set(18, 2.05, LAYOUT.wallZ);
   wall.receiveShadow = true;
-  scene.add(wall);
-
-  const floor = new Mesh(
-    new PlaneGeometry(80, 34),
-    new MeshStandardMaterial({
-      color: "#ffffff",
-      ...woodTexture,
-      roughness: 1,
-      normalScale: new Vector2(0.5, 0.5),
-    }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(20, -2.32, 7);
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  const frameMaterial = new MeshStandardMaterial({
-    color: "#b49a80",
-    roughness: 0.5,
-    metalness: 0.08,
-  });
-
-  // A softly frosted window gives the entry a believable source of daylight.
-  const windowPane = new Mesh(
-    new RoundedBoxGeometry(2.05, 3.15, 0.035, 4, 0.08),
-    new MeshStandardMaterial({
-      color: "#f7e8db",
-      emissive: "#ffe9cf",
-      emissiveIntensity: 1.34,
-      roughness: 0.78,
-    }),
-  );
-  windowPane.position.set(-3.04, 1.22, -2.69);
-  scene.add(windowPane);
-
-  for (const x of [-4.08, -3.05, -2.0]) {
-    const mullion = new Mesh(
-      new RoundedBoxGeometry(0.07, 3.28, 0.09, 3, 0.018),
-      frameMaterial,
-    );
-    mullion.position.set(x, 1.22, -2.62);
-    mullion.castShadow = true;
-    scene.add(mullion);
-  }
-  for (const y of [-0.4, 1.22, 2.84]) {
-    const rail = new Mesh(
-      new RoundedBoxGeometry(2.15, 0.07, 0.09, 3, 0.018),
-      frameMaterial,
-    );
-    rail.position.set(-3.04, y, -2.62);
-    rail.castShadow = true;
-    scene.add(rail);
-  }
-
-  const sill = new Mesh(
-    new RoundedBoxGeometry(2.42, 0.12, 0.32, 4, 0.035),
-    new MeshStandardMaterial({
-      color: "#cbb397",
-      roughness: 0.52,
-      metalness: 0.03,
-    }),
-  );
-  sill.position.set(-3.04, -0.48, -2.53);
-  sill.castShadow = true;
-  sill.receiveShadow = true;
-  scene.add(sill);
-
-  const curtainMaterial = new MeshStandardMaterial({
-    color: "#ead8cf",
-    roughness: 0.96,
-    transparent: true,
-    opacity: 0.92,
-  });
-  const curtain = new Mesh(
-    new RoundedBoxGeometry(0.64, 3.78, 0.13, 6, 0.06),
-    curtainMaterial,
-  );
-  curtain.position.set(-1.76, 1.18, -2.46);
-  curtain.rotation.z = -0.018;
-  curtain.castShadow = true;
-  scene.add(curtain);
-
-  const wallBandMaterial = new MeshStandardMaterial({
-    color: "#cbb8a8",
-    roughness: 0.72,
-  });
-  for (const y of [-1.7, 4.12]) {
-    const band = new Mesh(
-      new RoundedBoxGeometry(80, 0.11, 0.09, 3, 0.02),
-      wallBandMaterial,
-    );
-    band.position.set(20, y, -2.66);
-    band.castShadow = true;
-    scene.add(band);
-  }
-
-  // The small vase is intentionally off-centre, giving the product shot a room
-  // instead of a flat backdrop without competing with the camera.
-  const vase = new Mesh(
-    new CylinderGeometry(0.16, 0.24, 0.64, 32, 1, false),
-    new MeshPhysicalMaterial({
-      color: "#b96f78",
-      roughness: 0.29,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.18,
-    }),
-  );
-  vase.position.set(2.25, -1.15, -0.2);
-  vase.castShadow = true;
-  entryProps.add(vase);
-  const bloomColors = ["#f4c0c5", "#f2d39e", "#d2a5b6"];
-  for (let index = 0; index < 7; index++) {
-    const stem = new Mesh(
-      new CylinderGeometry(0.009, 0.012, 1.05 + (index % 3) * 0.12, 20),
-      new MeshStandardMaterial({ color: "#718c6b", roughness: 0.88 }),
-    );
-    stem.position.set(
-      2.25 + ((index * 17) % 7 - 3) * 0.045,
-      -0.43,
-      -0.2,
-    );
-    stem.rotation.z = ((index * 13) % 9 - 4) * 0.035;
-    entryProps.add(stem);
-    const bloom = new Mesh(
-      new SphereGeometry(0.11 + (index % 3) * 0.018, 18, 12),
-      new MeshPhysicalMaterial({
-        color: bloomColors[index % bloomColors.length],
-        roughness: 0.66,
-        clearcoat: 0.18,
-      }),
-    );
-    bloom.scale.set(1, 0.62, 0.42);
-    bloom.position.set(
-      stem.position.x + Math.sin(stem.rotation.z) * 0.5,
-      0.09 + (index % 4) * 0.06,
-      -0.17,
-    );
-    bloom.castShadow = true;
-    entryProps.add(bloom);
-  }
-
-  const signTexture = createSignTexture();
-  const sign = new Mesh(
-    new PlaneGeometry(4.7, 1.03),
-    new MeshBasicMaterial({
-      map: signTexture,
-      transparent: true,
-      toneMapped: false,
-    }),
-  );
-  sign.position.set(5.2, 3.62, -2.66);
-  scene.add(sign);
-
-  for (let index = 0; index < 6; index++) {
-    const lamp = new Mesh(
-      new SphereGeometry(0.045, 16, 12),
-      new MeshBasicMaterial({ color: "#fff8e9", toneMapped: false }),
-    );
-    lamp.position.set(3.3 + index * 2.2, 3.54, -2.55);
-    scene.add(lamp);
-  }
-
-  return { entryProps };
+  root.add(wall);
+  return root;
 }
 
 function buildLights(scene: Scene) {
-  const hemi = new HemisphereLight("#fffaf4", "#d9cabd", 0.55);
+  const hemi = new HemisphereLight("#fffaf4", "#d9c7b8", 0.7);
   scene.add(hemi);
 
-  const daylight = new DirectionalLight("#fff6ea", 2.6);
-  daylight.position.set(-4.7, 5.8, 5.4);
-  daylight.target.position.set(0.6, -0.4, -0.8);
+  const daylight = new DirectionalLight("#fff6ea", 2.45);
+  daylight.position.set(-3.4, 5.4, 6.2);
+  daylight.target.position.set(0.35, -0.35, -0.4);
   daylight.castShadow = true;
   daylight.shadow.mapSize.set(2048, 2048);
   daylight.shadow.bias = -0.00012;
   daylight.shadow.normalBias = 0.024;
   daylight.shadow.radius = 3;
   daylight.shadow.blurSamples = 16;
-  // Tight frustum that follows the view camera along the wall (see followX).
   daylight.shadow.camera.left = -6;
   daylight.shadow.camera.right = 6;
   daylight.shadow.camera.top = 5;
@@ -977,40 +906,43 @@ function buildLights(scene: Scene) {
   daylight.shadow.camera.far = 20;
   scene.add(daylight, daylight.target);
 
-  const key = new SpotLight("#fff2dc", 30, 26, Math.PI / 5, 0.88, 1.4);
-  key.position.set(-4.4, 6.8, 7.5);
-  key.target.position.set(0.4, -0.4, 0);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1536, 1536);
-  key.shadow.bias = -0.0001;
-  key.shadow.normalBias = 0.028;
-  key.shadow.camera.near = 0.5;
-  key.shadow.camera.far = 16;
-  key.shadow.radius = 4;
-  scene.add(key, key.target);
-
-  const wallWash = new SpotLight("#fff1ea", 9, 30, Math.PI / 4, 0.92, 1.2);
-  wallWash.position.set(7.8, 7, 5);
-  wallWash.target.position.set(8.5, 0.5, -2.7);
-  scene.add(wallWash, wallWash.target);
-
-  const fill = new HemisphereLight("#d7e4f4", "#b58f77", 0);
+  const fill = new DirectionalLight("#ffe9d8", 0.42);
+  fill.position.set(3.6, 2.4, 4.8);
   scene.add(fill);
+
+  const wallWash = new SpotLight("#fff1ea", 4.2, 32, Math.PI / 4, 0.92, 1.2);
+  wallWash.position.set(2.4, 6.6, 6.4);
+  wallWash.target.position.set(2.4, 0.55, LAYOUT.wallZ);
+  scene.add(wallWash, wallWash.target);
 
   const flash = new SpotLight("#fff7e6", 0, 9, Math.PI / 3, 1, 1.3);
   flash.position.set(0, 0.4, 2.2);
-  flash.target.position.set(0, -0.8, 5);
+  flash.target.position.set(0, -0.8, 0.4);
   scene.add(flash, flash.target);
 
   const daylightBase = daylight.position.clone();
   const daylightTargetBase = daylight.target.position.clone();
+  const washBase = wallWash.position.clone();
+  const washTargetBase = wallWash.target.position.clone();
+  const fillBase = fill.position.clone();
   function followX(x: number) {
     const offset = Math.max(0, x);
     daylight.position.set(daylightBase.x + offset, daylightBase.y, daylightBase.z);
-    daylight.target.position.set(daylightTargetBase.x + offset, daylightTargetBase.y, daylightTargetBase.z);
+    daylight.target.position.set(
+      daylightTargetBase.x + offset,
+      daylightTargetBase.y,
+      daylightTargetBase.z,
+    );
+    wallWash.position.set(washBase.x + offset, washBase.y, washBase.z);
+    wallWash.target.position.set(
+      washTargetBase.x + offset,
+      washTargetBase.y,
+      washTargetBase.z,
+    );
+    fill.position.set(fillBase.x + offset, fillBase.y, fillBase.z);
   }
 
-  return { key, wallWash, flash, followX };
+  return { wallWash, flash, followX };
 }
 
 function createCard(
@@ -1020,20 +952,10 @@ function createCard(
   loadedTextures: Set<Texture>,
 ): GalleryCard {
   const group = new Group();
-  const columns = 5;
-  const column = index % columns;
-  const row = Math.floor(index / columns) % 3;
-  const bay = Math.floor(index / (columns * 3));
-  const jitterX = ((index * 17) % 13 - 6) * 0.052;
-  const jitterY = ((index * 11) % 9 - 4) * 0.032;
-  const target = new Vector3(
-    4.34 + column * 1.66 + bay * 9.25 + jitterX,
-    -1.12 + row * 1.54 + jitterY,
-    // Pinned ~6cm off the plaster so the card casts a short, real shadow.
-    -2.665 + (index % 4) * 0.006,
-  );
-  const targetRotation = [-0.052, 0.022, 0.061, -0.031, 0.012][index % 5];
-  const targetScale = [1, 0.86, 0.96, 0.81, 1.04][index % 5];
+  const slot = cardSlot(index);
+  const target = new Vector3(slot.x, slot.y, slot.z);
+  const targetRotation = slot.rotation;
+  const targetScale = slot.scale;
   group.position.copy(target);
   group.rotation.z = targetRotation;
   group.scale.setScalar(targetScale);
@@ -1120,7 +1042,6 @@ function createCard(
   hit.position.z = 0.08;
   group.add(hit);
 
-  // Soft ambient-contact shadow just behind the card, faded in only once it rests on the wall.
   const contact = new Mesh(
     new PlaneGeometry(1.62, 2.1),
     new MeshBasicMaterial({
@@ -1136,28 +1057,6 @@ function createCard(
   group.add(contact);
 
   return { item, group, hit, target, targetScale, targetRotation, contact };
-}
-
-function createSignTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1400;
-  canvas.height = 280;
-  const context = canvas.getContext("2d");
-  if (context) {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "rgba(255,250,240,.7)";
-    context.beginPath();
-    context.roundRect(18, 20, 1364, 240, 108);
-    context.fill();
-    context.fillStyle = COLORS.blushDeep;
-    context.font = "600 116px ui-rounded, Arial Rounded MT Bold, sans-serif";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText("Sisi Moments", 700, 137);
-  }
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
 }
 
 function createPhotoTexture(item: MomentItem) {
