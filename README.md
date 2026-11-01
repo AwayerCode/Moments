@@ -15,7 +15,7 @@
 3. 鼠标拖动、滚轮或方向键左右浏览；到达边界后停止，不会因滑动退出画廊。
 4. 点击照片推近，近景支持拖动平移、滚轮缩放和双指捏合；点击另一张照片直接对焦，点击当前照片或按 `Esc` 退出近景；画廊中按 `Esc` 回到相机。
 
-房间不再使用照片背景。当前模型仍是空间原型，后续细化模型、材质与光照不需要重写交互。
+房间使用 Blender 实体几何。入口通过 Cycles 烘焙静态漫反射光照，Three.js 处理实时高光、镜片、出纸和画廊交互，没有照片背景。
 
 场景支持 `prefers-reduced-motion`；启用减少动态效果时用短淡入淡出代替长镜头。
 
@@ -133,7 +133,9 @@ GET /api/media/<object-key>
 - `public/models/`：运行时 GLB
 - `assets/reference/legacy/`：旧方案参考资产，不进入站点静态资源
 
-执行 `npm run assets:build` 会重新生成原型 `.blend` 和 `.glb`，覆盖手工修改。
+当前入口美术源文件为 `assets/lookdev/entry-lookdev.blend`；运行 `npm run assets:lookdev` 烘焙并导出网页使用的 `public/models/entry-scene.glb`。详见 [场景烘焙流程](assets/lookdev/README.md)。
+
+以下为基础原型制作工具，不会更新当前入口场景：执行 `npm run assets:build` 会重新生成原型 `.blend` 和 `.glb`，覆盖手工修改。
 手工精修 `.blend` 后使用 `npm run assets:export`，只导出 GLB。详见
 [模型制作约定](assets/source/README.md)。两条命令都支持 `BLENDER_BIN` 指定 Blender。
 

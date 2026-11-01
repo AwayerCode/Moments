@@ -16,7 +16,7 @@ export type GalleryCard = {
   setResident: (wanted: boolean) => void;
 };
 const COLORS = {
-  ink: "#5c4e4b",
+  ink: "#463b38",
   paper: "#fffaf0",
 };
 
@@ -99,7 +99,7 @@ export function createCard(
       metalness: 0,
     }),
   );
-  caption.position.set(0, -0.72, 0.03);
+  caption.position.set(0, -0.80, 0.03);
   caption.receiveShadow = true;
   group.add(caption);
 
@@ -115,8 +115,11 @@ export function createCard(
   pin.scale.set(1, 1, 0.48);
   pin.position.set(0, 0.94, 0.075);
   pin.castShadow = true;
-  group.add(pin);
-  const visuals: Mesh[] = [paper, photo, caption, pin];
+  // The wall pin belongs to the wall, not to the paper emerging from the camera.
+  const mount = new Group();
+  mount.position.copy(target); mount.rotation.z = targetRotation;
+  mount.scale.setScalar(targetScale); mount.add(pin); scene.add(mount);
+  const visuals: Mesh[] = [paper, photo, caption];
 
   const hit = new Mesh(
     new PlaneGeometry(1.5, 2.02),
@@ -214,10 +217,10 @@ function createCaptionTexture(caption: string) {
   if (context) {
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = COLORS.ink;
-    context.font = "600 56px ui-rounded, Arial Rounded MT Bold, sans-serif";
+    context.font = "500 80px ui-rounded, Arial Rounded MT Bold, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(caption, 600, 84);
+    context.fillText(caption, 600, 84, 1120);
   }
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;

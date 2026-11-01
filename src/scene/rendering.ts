@@ -35,7 +35,7 @@ export async function createRendering(renderer: WebGLRenderer, scene: Scene, vie
 
     const aoPass = new GTAOPass(scene, viewCamera, 512, 512);
     aoPass.output = GTAOPass.OUTPUT.Default;
-    aoPass.blendIntensity = 0.85;
+    aoPass.blendIntensity = 0.35;
     aoPass.updateGtaoMaterial({ radius: 0.32, distanceExponent: 1.4, thickness: 1, scale: 1 });
     aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
     // Keep invisible hit planes / soft decals out of the AO depth-normal prepass,
@@ -69,7 +69,7 @@ export async function createRendering(renderer: WebGLRenderer, scene: Scene, vie
     bokehPass = new BokehPass(scene, viewCamera, {
       focus: 6.8,
       aperture: 0.000055,
-      maxblur: 0.004,
+      maxblur: 0.002,
     });
     composer.addPass(bokehPass);
     resources.track(bokehPass);

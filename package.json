@@ -12,7 +12,8 @@
     "types": "wrangler types",
     "hash-invite": "node scripts/hash-invite.mjs",
     "assets:build": "node scripts/model-assets.mjs build",
-    "assets:export": "node scripts/model-assets.mjs export"
+    "assets:export": "node scripts/model-assets.mjs export",
+    "assets:lookdev": "node scripts/model-assets.mjs lookdev"
   },
   "dependencies": {
     "react": "^19.3.1",

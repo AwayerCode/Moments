@@ -1,4 +1,4 @@
-import { BoxGeometry, SpotLight, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Object3D, type Scene } from 'three';
+import { BoxGeometry, SpotLight, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, Vector3, type Object3D, type Scene } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { LAYOUT } from './galleryLayout.ts';
@@ -11,19 +11,16 @@ function required(root: Object3D, name: string) {
 }
 export async function loadWorld(scene: Scene, resources: SceneResources) {
   const loader = new GLTFLoader();
-  const playroom = (await loader.loadAsync('/models/playroom.glb')).scene;
+  const playroom = (await loader.loadAsync('/models/entry-scene.glb')).scene;
   if (!resources.active) { new SceneResources(playroom).dispose(); throw new Error("Scene cancelled"); }
   scene.add(playroom);
   const cameraActor = new Group();
   scene.add(cameraActor);
-  const model = (await loader.loadAsync('/models/sisi-camera.glb')).scene;
-  if (!resources.active) { new SceneResources(model).dispose(); throw new Error("Scene cancelled"); }
-  cameraActor.add(model);
   const mount = required(playroom, 'CameraMount');
   playroom.updateMatrixWorld(true);
   mount.matrixWorld.decompose(cameraActor.position, cameraActor.quaternion, cameraActor.scale);
   const markers = {
-    PrintSlot: required(model, 'PrintSlot'),
+    PrintSlot: required(playroom, 'PrintSlot'),
     EntryView: required(playroom, 'EntryView'),
     EntryPortrait: required(playroom, 'EntryPortrait'),
     EntryTarget: required(playroom, 'EntryTarget'),
@@ -33,12 +30,28 @@ export async function loadWorld(scene: Scene, resources: SceneResources) {
   if (Math.abs(galleryOrigin.x - LAYOUT.startX) > .01 || Math.abs(galleryOrigin.z - LAYOUT.wallZ) > .01) {
     throw new Error('Gallery anchor does not match the exported layout contract');
   }
-  scene.traverse(object => { if (object instanceof Mesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.traverse(object => {
+    if (!(object instanceof Mesh)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    // Diffuse radiance is baked into geometry; avoid adding the same shadows twice.
+    const baked = materials.every(m => m instanceof MeshStandardMaterial && m.emissiveMap);
+    object.castShadow = !baked; object.receiveShadow = !baked;
+    if (object.name.replaceAll('_', ' ').startsWith('Bunny tactile')) {
+      // Sub-pixel cotton strands must not become bright specular sparkles.
+      object.castShadow = false;
+      for (const material of materials) if (material instanceof MeshStandardMaterial) {
+        material.roughness = 1; material.envMapIntensity = .1;
+        material.color.multiplyScalar(.75);
+        if (material instanceof MeshPhysicalMaterial) material.specularIntensity = 0;
+      }
+    }
+  });
   if (!resources.active) throw new Error('Scene disposed while loading');
   return { playroom, cameraActor, markers };
 }
 export function createHeroHit(cameraActor: Group) {
   const hit = new Mesh(new BoxGeometry(3.5, 3.7, 1.55), new MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  hit.quaternion.copy(cameraActor.quaternion);
   hit.position.copy(cameraActor.position); hit.scale.copy(cameraActor.scale).multiplyScalar(1.12);
   return hit;
 }

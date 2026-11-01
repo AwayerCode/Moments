@@ -5,6 +5,11 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const mac = '/Applications/Blender.app/Contents/MacOS/Blender';
 const binary = process.env.BLENDER_BIN || (existsSync(mac) ? mac : 'blender');
 const mode = process.argv[2];
+if (mode === 'lookdev') {
+  const result = spawnSync(binary, ['--background', '--python-exit-code', '1', '--python', 'scripts/export-lookdev.py'], {cwd: root, stdio: 'inherit'});
+  if (result.error) throw result.error;
+  process.exit(result.status || 0);
+}
 if (!['build', 'export'].includes(mode)) throw new Error('Use build or export');
 for (const name of ['playroom', 'sisi-camera']) {
   const args = mode === 'build'

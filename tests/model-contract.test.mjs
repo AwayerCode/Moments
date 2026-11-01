@@ -9,9 +9,12 @@ function glb(name) {
  return JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString());
 }
 test('exported models retain named interaction anchors',()=>{
- const room=glb('playroom'),camera=glb('sisi-camera');
- for(const name of ['CameraMount','EntryView','EntryPortrait','EntryTarget','GalleryOrigin']) assert.ok(room.nodes.some(n=>n.name===name),name);
- assert.ok(camera.nodes.some(n=>n.name==='PrintSlot'));
+ const room=glb('entry-scene');
+ for(const name of ['CameraMount','PrintSlot','EntryView','EntryPortrait','EntryTarget','GalleryOrigin']) assert.ok(room.nodes.some(n=>n.name===name),name);
+ assert.ok(room.materials.some(m=>m.emissiveTexture), 'baked surface lighting is exported');
+ assert.ok(room.meshes.length>1, 'scene retains real meshes');
+ assert.ok(room.materials.some(m=>m.normalTexture), 'procedural surface normals survive export');
+ assert.ok(room.materials.some(m=>m.extensions?.KHR_materials_clearcoat), 'camera coating survives export');
 });
 test('printed paper clears the desk and emerges across the slot clip plane',()=>{
  const slot=new Vector3(-.04,-.76-.91*.5,.57*.5);
@@ -38,4 +41,13 @@ test('paper flight keeps its full rectangle above the desk and crosses props at 
   }
   if(t>=.3 && t<=.75) assert.ok(center.y-.92*scale>1.2);
  }
+});
+
+test('rotated camera prints along its own slot normal',()=>{
+ const yaw=-Math.PI/20, slot=new Vector3(-.04,-1.215,.285);
+ const path=printPath(slot,.5,yaw);
+ const direction=path.end.clone().sub(path.start).normalize();
+ assert.ok(direction.distanceTo(new Vector3(Math.sin(yaw),0,Math.cos(yaw)))<1e-9);
+ assert.ok(path.clip.distanceToPoint(path.start)<0);
+ assert.ok(path.clip.distanceToPoint(path.end)>0);
 });

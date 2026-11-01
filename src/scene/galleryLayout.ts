@@ -5,7 +5,7 @@ export const LAYOUT = {
   cardLift: 0.085,
   columns: 3,
   rows: 3,
-  columnSpacing: 1.72,
+  columnSpacing: 1.86,
   rowSpacing: 2.12,
   bayGap: 1.0,
   startX: 12,
@@ -39,7 +39,7 @@ export function cardSlot(index: number): CardSlot {
   const column = index % LAYOUT.columns;
   const row = Math.floor(index / LAYOUT.columns) % LAYOUT.rows;
   const bay = Math.floor(index / (LAYOUT.columns * LAYOUT.rows));
-  const jitterX = ((index * 17) % 13 - 6) * 0.052;
+  const jitterX = ((index * 17) % 13 - 6) * 0.018;
   const jitterY = ((index * 11) % 9 - 4) * 0.032;
   const bayWidth = LAYOUT.columns * LAYOUT.columnSpacing + LAYOUT.bayGap;
   return {

@@ -36,3 +36,13 @@ worker-configuration.d.ts
 
 # Blender automatic backups
 *.blend[0-9]*
+
+# Reproducible intermediate UV bakes; the runtime GLB embeds the final maps.
+assets/lookdev/*-diffuse.png
+assets/lookdev/*-normal.png
+assets/lookdev/runtime-atlas-*.png
+assets/lookdev/runtime-atlas-*.jpg
+assets/lookdev/runtime-staging.glb
+
+# Python helper bytecode
+__pycache__/

@@ -1,0 +1,346 @@
+{
+  "desk_crossings": [],
+  "other_pairs": [
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Front continuous molded shell",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Sculpted grip",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Lamp weighted base",
+      "b": "Cloth bound book cover.003",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Bunny body",
+      "b": "Stacking ring",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Bunny soft arm.001",
+      "b": "Front continuous molded shell",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Storybook pages",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Cloth bound book cover",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Cloth bound book cover.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Book rounded spine",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Storybook pages.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Cloth bound book cover.002",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Cloth bound book cover.003",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Book rounded spine.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Lamp weighted base",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Lamp stem",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Mushroom shade",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 0",
+      "b": "Lamp opal diffuser",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Storybook pages",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Cloth bound book cover",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Cloth bound book cover.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Book rounded spine",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Storybook pages.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Cloth bound book cover.002",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Cloth bound book cover.003",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Book rounded spine.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Lamp weighted base",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Lamp stem",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Mushroom shade",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 1",
+      "b": "Lamp opal diffuser",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Storybook pages",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Cloth bound book cover",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Cloth bound book cover.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Book rounded spine",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Storybook pages.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Cloth bound book cover.002",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Cloth bound book cover.003",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Book rounded spine.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Lamp weighted base",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Lamp stem",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Mushroom shade",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 2",
+      "b": "Lamp opal diffuser",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Storybook pages",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Cloth bound book cover",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Cloth bound book cover.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Book rounded spine",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Storybook pages.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Cloth bound book cover.002",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Cloth bound book cover.003",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Book rounded spine.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Lamp weighted base",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Lamp stem",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Mushroom shade",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Rounded toy block 3",
+      "b": "Lamp opal diffuser",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Draped muslin cloth",
+      "b": "Desk ivory apron",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Draped muslin cloth",
+      "b": "Desk front edge detail",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny body",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny head",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny soft arm",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny soft arm.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny ear",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Peach stitched ear",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny foot",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Embroidered eye",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny ear.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Peach stitched ear.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny foot.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Embroidered eye.001",
+      "triangle_intersections": 0
+    },
+    {
+      "a": "Woven ribbon replacement",
+      "b": "Bunny nose",
+      "triangle_intersections": 0
+    }
+  ],
+  "note": "Surface intersection diagnostic; intentional joints require review, and containment is not detected."
+}

@@ -33,3 +33,12 @@ test('new bays move along the same world wall',()=>{
   assert.ok(cardSlot(9).x>cardSlot(0).x+6);
   assert.ok(Math.abs(cardSlot(9).z-cardSlot(0).z)<.03);
 });
+
+test('neighboring prints have positive clearance including rotation and jitter',()=>{
+ const halfX=c=>(1.36*Math.abs(Math.cos(c.rotation))+1.84*Math.abs(Math.sin(c.rotation)))*c.scale/2;
+ for(let i=0;i<300;i++){
+  if(i%LAYOUT.columns===LAYOUT.columns-1)continue;
+  const a=cardSlot(i),b=cardSlot(i+1);
+  assert.ok(b.x-halfX(b)-(a.x+halfX(a))>.08,`overlapping pair ${i}/${i+1}`);
+ }
+});

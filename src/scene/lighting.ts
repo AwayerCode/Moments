@@ -1,4 +1,4 @@
-import { DirectionalLight, HemisphereLight, PMREMGenerator, SpotLight, type Scene, type WebGLRenderer } from 'three';
+import { Vector3, DirectionalLight, HemisphereLight, PMREMGenerator, SpotLight, type Scene, type WebGLRenderer } from 'three';
 /** Stable world lights; no screen-following studio rigs. */
 export function buildLights(scene: Scene, shadowMapSize: number) {
   scene.add(new HemisphereLight('#f6f5ff', '#c6a382', 1.2));
@@ -17,7 +17,7 @@ export function buildLights(scene: Scene, shadowMapSize: number) {
 /** Capture the actual static room once, not a painted backdrop or gradient sphere. */
 export function buildEnvironment(renderer: WebGLRenderer, scene: Scene) {
   const generator = new PMREMGenerator(renderer);
-  const environment = generator.fromScene(scene, .04, .1, 60);
+  const environment = generator.fromScene(scene, .015, .05, 60, {position: new Vector3(0, -.35, 1.4)});
   generator.dispose();
   return environment;
 }

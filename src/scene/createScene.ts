@@ -1,7 +1,7 @@
 import { entryPose as getEntryPose, galleryPose as getGalleryPose, inspectPose as getInspectPose } from "./cameraRig.ts";
 import { flightPosition, easeInOut, easeOut, clamp, lerp, printPath } from "./sequence.ts";
 import { createRendering } from "./rendering.ts";
-import { ACESFilmicToneMapping, Color, PCFShadowMap, PerspectiveCamera, Plane, Raycaster, Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer } from "three";
+import { AgXToneMapping, Color, PCFShadowMap, PerspectiveCamera, Plane, Raycaster, Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer } from "three";
 import type { MomentItem } from "../../shared/moments.ts";
 import { LAYOUT, TIMING, galleryPanBounds, galleryStartX, rubberBandPan, settlePanX } from "./galleryLayout.ts";
 import { selectRenderQuality } from "./renderQuality.ts";
@@ -60,8 +60,8 @@ export async function createMomentsScene(
   });
   renderer.setPixelRatio(quality.pixelRatio);
   renderer.outputColorSpace = SRGBColorSpace;
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.9;
+  renderer.toneMapping = AgXToneMapping;
+  renderer.toneMappingExposure = 1.35;
   renderer.shadowMap.enabled = true;
   // r18x: PCFShadowMap is the soft PCF path (PCFSoftShadowMap was removed); softness via shadow.radius.
   renderer.shadowMap.type = PCFShadowMap;
@@ -134,7 +134,7 @@ export async function createMomentsScene(
     cameraActor.updateMatrixWorld(true);
     const slot = markers.PrintSlot;
     const slotPosition = slot.getWorldPosition(new Vector3());
-    const path = printPath(slotPosition, cameraActor.scale.x);
+    const path = printPath(slotPosition, cameraActor.scale.x, cameraActor.rotation.y);
     heroPrintScale = path.scale;
     startCardPosition.copy(path.start);
     ejectedCardPosition.copy(path.end);
@@ -219,7 +219,7 @@ export async function createMomentsScene(
     if (!cover) return;
     setCoverClipped(true);
     cover.group.position.copy(startCardPosition);
-    cover.group.rotation.set(-Math.PI / 2, 0, 0);
+    cover.group.rotation.set(-Math.PI / 2, 0, cameraActor.rotation.y);
     cover.group.scale.setScalar(heroPrintScale);
     cover.group.visible = false;
     cover.setResident(true);
@@ -506,7 +506,8 @@ export async function createMomentsScene(
     composer?.setSize(width, height);
     viewCamera.aspect = width / height;
 
-    viewCamera.fov = viewCamera.aspect < 0.72 ? 46 : 33;
+    const framing = clamp((viewCamera.aspect - .6) / .6, 0, 1);
+    viewCamera.fov = lerp(46, 33, framing * framing * (3 - 2 * framing));
     viewCamera.updateProjectionMatrix();
     syncCameraStage();
     targetGalleryX = settlePanX(targetGalleryX, galleryMinX(), galleryLimitX());
@@ -560,7 +561,7 @@ export async function createMomentsScene(
         const progress = easeOut(clamp((sequenceTime - 0.08) / 0.78, 0, 1));
         cover.group.position.lerpVectors(startCardPosition, ejectedCardPosition, progress);
         cover.group.rotation.x = -Math.PI / 2;
-        cover.group.rotation.z = Math.sin(progress * Math.PI * 2) * 0.018;
+        cover.group.rotation.z = cameraActor.rotation.y + Math.sin(progress * Math.PI * 2) * 0.008;
         cover.group.scale.setScalar(heroPrintScale);
       }
       lights.flash.intensity = Math.max(0, 80 - Math.max(0, sequenceTime - 0.04) * 300);
@@ -578,7 +579,7 @@ export async function createMomentsScene(
         // Clear the desk and toys before turning the paper upright.
         cover.group.position.copy(flightPosition(ejectedCardPosition, cover.target, progress));
         const turn = easeInOut(clamp((progress - .3) / .45, 0, 1));
-        cover.group.rotation.set(-Math.PI / 2 * (1 - turn), 0, cover.targetRotation * turn);
+        cover.group.rotation.set(-Math.PI / 2 * (1 - turn), 0, lerp(cameraActor.rotation.y, cover.targetRotation, turn));
         cover.group.scale.setScalar(lerp(heroPrintScale, cover.targetScale, turn));
       }
       if (progress >= 1) finishEnterGallery();
@@ -625,6 +626,7 @@ export async function createMomentsScene(
 
     if (bokehPass) {
       const uniforms = bokehPass.materialBokeh.uniforms;
+      if (uniforms.aperture) uniforms.aperture.value = phase === "camera" ? .000025 : 0;
       if (uniforms.focus) {
         uniforms.focus.value = viewCamera.position.distanceTo(currentTarget);
       }
