@@ -7,7 +7,7 @@ def mat(name,color,rough=.5):
  m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
  p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*color,1); p.inputs['Roughness'].default_value=rough
  return m
-cream=mat('Warm plaster',(.85,.77,.65),.9); wood=mat('Honey birch',(.65,.43,.24),.48)
+cream=mat('Warm plaster',(.85,.77,.65),.9); wood=mat('Honey birch',(.74,.58,.39),.46)
 white=mat('Ivory painted wood',(.95,.89,.77),.42); pink=mat('Peach enamel',(.82,.39,.43),.4)
 mint=mat('Sage painted wood',(.43,.65,.52),.55); blue=mat('Powder blue',(.42,.65,.78),.5); yellow=mat('Butter yellow',(.88,.69,.33),.5)
 def pos(p): return (p[0],-p[2],p[1])
@@ -38,17 +38,34 @@ for y in [-.5,3.5]:box('Window frame',(0,y,-2.83),(5.15,.16,.27),white,.025)
 box('Window mullion',(0,1.5,-2.8),(.09,4,.17),white,.015)
 box('Window crossbar',(0,1.6,-2.8),(5,.09,.17),white,.015)
 box('Deep window sill',(0,-.59,-2.58),(5.5,.15,.8),white,.04)
-# Pleated curtains, each fold is mesh geometry.
+# Continuous fabric with gravity-shaped folds and stitched hems.
 for side in [-1,1]:
- for i in range(9):
-  x=side*(2.45+i*.095)
-  ball('Linen curtain fold',(x,1.48,-2.48),(.09,2.22,.10),white)
+ vertices=[]; faces=[]; nx=64; ny=32
+ for j in range(ny+1):
+  t=j/ny
+  for i in range(nx+1):
+   u=i/nx; x=side*(2.42+u*.88)
+   y=3.7-t*4.45
+   z=-2.48+.075*math.cos(u*math.pi*16)*(1+.35*t)+.035*math.sin(t*math.pi)
+   vertices.append(pos((x,y,z)))
+ for j in range(ny):
+  for i in range(nx):
+   a=j*(nx+1)+i;faces.append((a,a+1,a+nx+2,a+nx+1))
+ mesh=bpy.data.meshes.new('Fabric folds');mesh.from_pydata(vertices,[],faces);mesh.update()
+ obj=bpy.data.objects.new('Continuous linen curtain',mesh);bpy.context.collection.objects.link(obj);obj.data.materials.append(white)
+ for face in mesh.polygons:face.use_smooth=True
+ solid=obj.modifiers.new('Fabric thickness','SOLIDIFY');solid.thickness=.012
+ box('Curtain weighted hem',(side*2.86,-.75,-2.48),(.9,.045,.11),white,.018)
+# Joinery makes the desk read as a manufactured object.
+for x in [-3.4,3.4]:
+ box('Desk side stretcher',(x,-3.25,.05),(.16,.15,3.4),wood,.025)
+box('Desk front edge detail',(0,-1.43,2.25),(7.8,.035,.018),white,.008)
 # Small wooden houses and blocks.
 for i,(x,z,m) in enumerate([(1.6,.1,mint),(2.13,.2,yellow),(2.65,-.15,pink),(1.9,-.5,blue)]):
  box('Rounded toy block '+str(i),(x,-1.10,z),(.48,.5,.48),m,.035)
 box('Toy house',(2.5,-.82,-.75),(.65,1.06,.65),white,.035)
-roof=box('House roof',(2.25,-.17,-.75),(.7,.12,.74),pink,.025);roof.rotation_euler[1]=-math.pi/4
-roof=box('House roof second',(2.75,-.17,-.75),(.7,.12,.74),pink,.025);roof.rotation_euler[1]=math.pi/4
+roof=box('House roof',(2.25,-.17,-.75),(.7,.12,.74),pink,.025);roof.rotation_euler[1]=math.pi/4
+roof=box('House roof second',(2.75,-.17,-.75),(.7,.12,.74),pink,.025);roof.rotation_euler[1]=-math.pi/4
 # Stacking rings on the left, real rounded geometry.
 box('Stacking toy base',(-2.05,-1.27,-.2),(.85,.16,.85),white,.06)
 for i,m in enumerate([pink,yellow,mint,blue]):

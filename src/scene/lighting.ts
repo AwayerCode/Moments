@@ -9,7 +9,7 @@ export function buildLights(scene: Scene, shadowMapSize: number) {
   Object.assign(sun.shadow.camera, {left:-8,right:8,top:8,bottom:-8,near:.1,far:30});
   sun.shadow.bias = -.0001; sun.shadow.normalBias = .015; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
-  const fill = new DirectionalLight('#e8efff', .65); fill.position.set(3,4,8); scene.add(fill);
+  const fill = new DirectionalLight('#e8efff', 1.15); fill.position.set(3,4,8); scene.add(fill);
   const flash = new SpotLight('#fff7e6', 0, 9, Math.PI/3, 1, 1.3);
   flash.position.set(0,.1,.5); flash.target.position.set(0,-1,2); scene.add(flash,flash.target);
   return {flash};

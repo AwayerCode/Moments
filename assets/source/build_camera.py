@@ -10,9 +10,9 @@ def mat(name,color,rough=.4,metal=0):
  m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
  b=m.node_tree.nodes.get('Principled BSDF'); b.inputs['Base Color'].default_value=(*color,1); b.inputs['Roughness'].default_value=rough; b.inputs['Metallic'].default_value=metal
  return m
-pink=mat('Shell | satin rose polymer',(.63,.235,.28),.34)
+pink=mat('Shell | satin rose polymer',(.82,.43,.47),.3)
 edge=mat('Seam | deep rose',(.32,.075,.105),.6)
-lightpink=mat('Lens housing | blush',(.72,.31,.35),.32)
+lightpink=mat('Lens housing | blush',(.88,.51,.54),.28)
 black=mat('Rubber | charcoal',(.014,.017,.021),.63)
 metal=mat('Metal | brushed nickel',(.53,.48,.42),.26,.88)
 glass=mat('Glass | coated optic',(.016,.035,.05),.08,.22)

@@ -1,4 +1,5 @@
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Object3D, type Scene } from 'three';
+import { BoxGeometry, SpotLight, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Object3D, type Scene } from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { LAYOUT } from './galleryLayout.ts';
 import { SceneResources } from './resources.ts';
@@ -46,16 +47,32 @@ export function buildGalleryWall(scene: Scene) {
   const root = new Group(); scene.add(root);
   const geometry = new BoxGeometry(6, 12, .2);
   const material = new MeshStandardMaterial({color:'#e9dfd1',roughness:.9});
+  const lampGeometry = new RoundedBoxGeometry(1.1, .12, .25, 3, .04);
+  const lampMaterial = new MeshStandardMaterial({color:"#fff0da",roughness:.32,metalness:.15});
   const floorGeometry = new BoxGeometry(6, .15, 22);
   const sourceFloor = scene.getObjectByName('Room_floor');
   const floorMaterial = sourceFloor instanceof Mesh ? sourceFloor.material : new MeshStandardMaterial({color:'#d6b68f',roughness:.8});
   let right = 9.5;
-  return { ensure(x: number) {
+  const lamps: SpotLight[] = [];
+  return { update(x: number) {
+    for (const lamp of lamps) lamp.visible = Math.abs(lamp.position.x - x) < 10;
+  }, ensure(x: number) {
     while (right < x + 8) {
       const wall = new Mesh(geometry, material);
       wall.position.set(right + 3, 2, LAYOUT.wallZ - .1);
       wall.receiveShadow = true;
       root.add(wall);
+      const lamp = new Mesh(lampGeometry, lampMaterial);
+      lamp.position.set(right + 3, 4.8, LAYOUT.wallZ + .65);
+      root.add(lamp);
+      const light = new SpotLight('#fff1da', 9, 11, 1.1, 1, 2);
+      light.position.copy(lamp.position); light.position.y -= .08;
+      light.target.position.set(right + 3, 1, LAYOUT.wallZ);
+      light.castShadow = true;
+      light.shadow.mapSize.set(512,512);
+      light.shadow.normalBias = .008;
+      lamps.push(light);
+      root.add(light, light.target);
       const floor = new Mesh(floorGeometry, floorMaterial);
       floor.position.set(right + 3, -4, 0);
       floor.receiveShadow = true;

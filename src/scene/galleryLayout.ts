@@ -18,7 +18,7 @@ export const LAYOUT = {
 
 export const TIMING = {
   print: 0.95,
-  firstDolly: 1.05,
+  firstDolly: 2.8,
   shortDolly: 0.62,
   returnDolly: 0.88,
   reducedFade: 0.16,

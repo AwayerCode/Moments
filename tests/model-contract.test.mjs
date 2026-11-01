@@ -21,3 +21,21 @@ test('printed paper clears the desk and emerges across the slot clip plane',()=>
  assert.ok(path.clip.distanceToPoint(path.end)>0);
  assert.equal(path.start.y,path.end.y);
 });
+
+test('paper flight keeps its full rectangle above the desk and crosses props at height', async()=>{
+ const {flightPosition,easeInOut,clamp}=await import('../src/scene/sequence.ts');
+ const start=printPath(new Vector3(-.04,-1.215,.285),.5).end;
+ const end=new Vector3(11.688,-1.248,-2.805);
+ assert.deepEqual(flightPosition(start,end,0).toArray(),start.toArray());
+ assert.ok(flightPosition(start,end,1).distanceTo(end)<1e-10);
+ for(let i=0;i<=300;i++) {
+  const t=i/300,center=flightPosition(start,end,t);
+  const turn=easeInOut(clamp((t-.3)/.45,0,1));
+  const scale=.52+(1-.52)*turn;
+  for(const x of [-.68,.68])for(const y of [-.92,.92]) {
+   const corner=new Vector3(x*scale,y*scale,0).applyAxisAngle(new Vector3(1,0,0),-Math.PI/2*(1-turn)).add(center);
+   if(Math.abs(corner.x)<4 && Math.abs(corner.z-.05)<2.2) assert.ok(corner.y>-1.35,`desk collision at ${t}`);
+  }
+  if(t>=.3 && t<=.75) assert.ok(center.y-.92*scale>1.2);
+ }
+});

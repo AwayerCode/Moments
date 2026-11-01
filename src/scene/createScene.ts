@@ -1,5 +1,5 @@
 import { entryPose as getEntryPose, galleryPose as getGalleryPose, inspectPose as getInspectPose } from "./cameraRig.ts";
-import { easeInOut, easeOut, clamp, lerp, printPath } from "./sequence.ts";
+import { flightPosition, easeInOut, easeOut, clamp, lerp, printPath } from "./sequence.ts";
 import { createRendering } from "./rendering.ts";
 import { ACESFilmicToneMapping, Color, PCFShadowMap, PerspectiveCamera, Plane, Raycaster, Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer } from "three";
 import type { MomentItem } from "../../shared/moments.ts";
@@ -108,6 +108,11 @@ export async function createMomentsScene(
   let pointerDownX = 0;
   let pointerDownY = 0;
   let previousPointerX = 0;
+  let previousPointerY = 0;
+  const inspectOffset = new Vector3();
+  let inspectZoom = 1;
+  const touches = new Map<number, Vector2>();
+  let pinchDistance = 0;
   let enteredGalleryOnce = false;
   let pointer = new Vector2(99, 99);
   const raycaster = new Raycaster();
@@ -178,7 +183,12 @@ export async function createMomentsScene(
     };
   }
 
-  function inspectPose(card: GalleryCard) { return getInspectPose(card.target, card.targetScale, viewCamera); }
+  function inspectPose(card: GalleryCard) {
+    const pose = getInspectPose(card.target, card.targetScale, viewCamera);
+    pose.position.z = card.target.z + (pose.position.z - card.target.z) * inspectZoom;
+    pose.position.add(inspectOffset); pose.target.add(inspectOffset);
+    return pose;
+  }
 
   function setCoverClipped(clipped: boolean) {
     const cover = cards[0];
@@ -356,16 +366,20 @@ export async function createMomentsScene(
   }
 
   function onPointerDown(event: PointerEvent) {
-    if (phase === "inspect") {
-      closeInspect();
-      return;
+    if (event.pointerType === "touch" && phase === "inspect") {
+      touches.set(event.pointerId, new Vector2(event.clientX, event.clientY));
+      if (touches.size === 2) {
+        const [a,b] = [...touches.values()]; pinchDistance = a.distanceTo(b);
+        dragged = true; canvas.setPointerCapture(event.pointerId); return;
+      }
     }
-    if (phase === "gallery") {
+    if (phase === "gallery" || phase === "inspect") {
       dragging = true;
       dragged = false;
       pointerDownX = event.clientX;
       pointerDownY = event.clientY;
       previousPointerX = event.clientX;
+      previousPointerY = event.clientY;
       canvas.setPointerCapture(event.pointerId);
       return;
     }
@@ -378,14 +392,29 @@ export async function createMomentsScene(
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (dragging && phase === "gallery") {
+    if (touches.has(event.pointerId)) {
+      touches.set(event.pointerId, new Vector2(event.clientX, event.clientY));
+      if (touches.size === 2 && phase === "inspect") {
+        const [a,b] = [...touches.values()]; const distance = a.distanceTo(b);
+        if (distance > 0 && pinchDistance > 0) inspectZoom = clamp(inspectZoom * pinchDistance / distance, .45, 2.2);
+        pinchDistance = distance; dragged = true; return;
+      }
+    }
+    if (dragging && (phase === "gallery" || phase === "inspect")) {
       const dx = event.clientX - previousPointerX;
       if (Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY) > 7) {
         dragged = true;
       }
       const width = 2 * Math.tan(viewCamera.fov * Math.PI / 360) * (viewCamera.position.z - LAYOUT.wallZ) * viewCamera.aspect;
-      applyPan(-dx * width / canvas.clientWidth);
+      if (phase === "inspect" && inspected) {
+        inspectOffset.x -= dx * width / canvas.clientWidth;
+        inspectOffset.y += (event.clientY - previousPointerY) * width / canvas.clientWidth;
+        inspectOffset.x = clamp(inspectOffset.x, cards[0].target.x - inspected.target.x - 1, Math.max(...cards.map(c => c.target.x)) - inspected.target.x + 1);
+        inspectOffset.y = clamp(inspectOffset.y, -2.5 - inspected.target.y, 4.5 - inspected.target.y);
+        if (inspected.target.x + inspectOffset.x > galleryLimitX() - 3.2) callbacks.onNearEnd?.();
+      } else applyPan(-dx * width / canvas.clientWidth);
       previousPointerX = event.clientX;
+      previousPointerY = event.clientY;
       canvas.style.cursor = "grabbing";
       return;
     }
@@ -404,15 +433,24 @@ export async function createMomentsScene(
   }
 
   function onPointerUp(event: PointerEvent) {
+    touches.delete(event.pointerId);
+    if (pinchDistance > 0) {
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      if (!touches.size) { pinchDistance = 0; dragging = false; }
+      else { const remaining = [...touches.values()][0]; previousPointerX = remaining.x; previousPointerY = remaining.y; }
+      return;
+    }
     if (canvas.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
     }
-    if (dragging && phase === "gallery") {
+    if (dragging && (phase === "gallery" || phase === "inspect")) {
       if (!dragged && event.type !== "pointercancel") {
         updateRaycaster(event);
         const card = pickCard();
         if (card) {
-          beforeInspectX = targetGalleryX;
+          if (phase === "inspect" && card === inspected) { closeInspect(); dragging = false; return; }
+          if (phase === "gallery") beforeInspectX = targetGalleryX;
+          inspectOffset.set(0, 0, 0); inspectZoom = 1;
           inspected = card;
           targetGalleryX = card.target.x;
           callbacks.onInspect?.(card.item);
@@ -427,8 +465,13 @@ export async function createMomentsScene(
   }
 
   function onWheel(event: WheelEvent) {
-    if (phase !== "gallery") return;
+    if (phase !== "gallery" && phase !== "inspect") return;
     event.preventDefault();
+    if (phase === "inspect") {
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1);
+      inspectZoom = clamp(inspectZoom * Math.exp(clamp(delta * .002, -.3, .3)), .45, 2.2);
+      return;
+    }
     const delta =
       Math.abs(event.deltaX) > Math.abs(event.deltaY)
         ? event.deltaX
@@ -498,6 +541,7 @@ export async function createMomentsScene(
     lastFrame = now;
     const delta = Math.min(0.05, rawDelta);
 
+    galleryWall.update(viewCamera.position.x);
     for (const card of cards) {
       const hero = card === cards[0] && !enteredGalleryOnce && (phase === "printing" || phase === "transition");
       const near = Math.abs(card.target.x - viewCamera.position.x) < 14;
@@ -531,15 +575,11 @@ export async function createMomentsScene(
       viewCamera.lookAt(currentTarget);
       const cover = cards[0];
       if (cover && !enteredGalleryOnce) {
-        cover.group.position.lerpVectors(ejectedCardPosition, cover.target, progress);
-        cover.group.position.y += Math.sin(progress * Math.PI) * 1.5;
-        cover.group.rotation.z =
-          Math.sin(progress * Math.PI) * -0.06 + cover.targetRotation * easeOut(progress);
-        cover.group.rotation.y = 0;
-        cover.group.rotation.x = -Math.PI / 2 * (1 - progress);
-        cover.group.scale.setScalar(
-          lerp(heroPrintScale, cover.targetScale, easeOut(progress)),
-        );
+        // Clear the desk and toys before turning the paper upright.
+        cover.group.position.copy(flightPosition(ejectedCardPosition, cover.target, progress));
+        const turn = easeInOut(clamp((progress - .3) / .45, 0, 1));
+        cover.group.rotation.set(-Math.PI / 2 * (1 - turn), 0, cover.targetRotation * turn);
+        cover.group.scale.setScalar(lerp(heroPrintScale, cover.targetScale, turn));
       }
       if (progress >= 1) finishEnterGallery();
     } else if (phase === "returning") {
