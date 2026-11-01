@@ -3,7 +3,7 @@ Original work, no third-party assets. Run: python3 scripts/gen_textures.py"""
 import numpy as np
 from PIL import Image
 import os
-OUT=os.path.join(os.path.dirname(__file__),'..','public','textures')
+OUT=os.path.join(os.path.dirname(__file__),'..','assets','reference','legacy')
 rng=np.random.default_rng(7)
 def fnoise(n,lo,hi,seed):
     """Tileable band-limited noise via FFT filtering, normalised to 0..1."""

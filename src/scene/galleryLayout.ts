@@ -1,19 +1,17 @@
 /** Frontal wall layout and horizontal-pan rules for the Moments scene. */
 
 export const LAYOUT = {
-  wallZ: -2.75,
+  wallZ: -2.89,
   cardLift: 0.085,
-  columns: 4,
+  columns: 3,
   rows: 3,
-  columnSpacing: 1.66,
-  rowSpacing: 1.54,
+  columnSpacing: 1.72,
+  rowSpacing: 2.12,
   bayGap: 1.0,
-  startX: 0,
+  startX: 12,
   baseY: -1.12,
   /** How far the view can stretch past the left bound before it hard-stops. */
   overscroll: 1.05,
-  /** Overscroll past the left bound that commits a return to the camera. */
-  returnTrigger: 0.38,
   /** Overscroll is compressed so the wall feels rubbery, not linear. */
   rubber: 0.42,
 } as const;
@@ -55,11 +53,20 @@ export function cardSlot(index: number): CardSlot {
 
 /** First gallery pose: centered on the opening field of prints, not one card. */
 export function galleryStartX() {
-  return LAYOUT.startX + LAYOUT.columnSpacing * 1.45;
+  return LAYOUT.startX + LAYOUT.columnSpacing;
 }
 
-export function galleryMaxX(lastCardX: number) {
-  return Math.max(galleryStartX(), lastCardX - LAYOUT.columnSpacing * 1.2);
+/** Camera centers that expose both edge prints, including rotation and margin. */
+export function galleryPanBounds(cards: {x:number; scale:number; rotation:number}[], halfWidth: number) {
+  if (!cards.length) return { min: galleryStartX(), max: galleryStartX() };
+  const extents = cards.map(c => {
+    const half = (Math.abs(Math.cos(c.rotation)) * 1.36 + Math.abs(Math.sin(c.rotation)) * 1.84) * c.scale / 2;
+    return { left:c.x-half-.2, right:c.x+half+.2 };
+  });
+  const left = Math.min(...extents.map(c=>c.left));
+  const right = Math.max(...extents.map(c=>c.right));
+  if (right-left <= halfWidth*2) return {min:(left+right)/2, max:(left+right)/2};
+  return {min:left+halfWidth, max:right-halfWidth};
 }
 
 export function rubberBandPan(
@@ -73,10 +80,6 @@ export function rubberBandPan(
   if (proposed >= minX) return proposed;
   const overflow = minX - proposed;
   return minX - Math.min(LAYOUT.overscroll, overflow * LAYOUT.rubber);
-}
-
-export function shouldReturnToCamera(x: number, minX: number) {
-  return x <= minX - LAYOUT.returnTrigger;
 }
 
 export function settlePanX(x: number, minX: number, maxX: number) {

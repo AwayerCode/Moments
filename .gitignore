@@ -33,3 +33,6 @@ worker-configuration.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+# Blender automatic backups
+*.blend[0-9]*

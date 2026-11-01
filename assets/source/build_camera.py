@@ -127,6 +127,8 @@ curve.bevel_depth=.035;curve.bevel_resolution=3
 ob=bpy.data.objects.new('Woven wrist strap',curve);bpy.context.collection.objects.link(ob);ob.data.materials.append(strapmat)
 bpy.context.view_layer.objects.active=ob;ob.select_set(True);bpy.ops.object.convert(target='MESH');ob.select_set(False)
 rounded('Wrist strap slider',.14,.39,.12,.035,lightpink,(-1.77,.08,.1))
+# Runtime anchors export with the model and follow its physical scale.
+anchor=bpy.data.objects.new('PrintSlot',None);bpy.context.collection.objects.link(anchor);anchor.location=pos((0,-.91,.57))
 # Export source for future hand sculpting; no personal data or third-party assets.
 bpy.ops.object.select_all(action='SELECT')
 bpy.context.preferences.filepaths.save_version=0

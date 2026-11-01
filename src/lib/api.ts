@@ -1,24 +1,5 @@
-export type Palette = "peach" | "sky" | "mint" | "lilac" | "butter";
-
-export type MomentItem = {
-  id: string;
-  caption: string;
-  src?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotate: number;
-  palette: Palette;
-  pin: "tl" | "tr" | "top";
-};
-
-export async function fetchSession(): Promise<boolean> {
-  const response = await fetch("/api/session", { credentials: "same-origin" });
-  if (response.status === 401) return false;
-  if (!response.ok) throw new Error("session_failed");
-  return true;
-}
+import type { MomentItem, MomentsPage } from "../../shared/moments.ts";
+export type { MomentItem, Palette } from "../../shared/moments.ts";
 
 export async function claimInviteFromLocation(): Promise<boolean> {
   const pathMatch = window.location.pathname.match(/^\/i\/([^/]+)\/?$/);
@@ -39,10 +20,7 @@ export async function claimInviteFromLocation(): Promise<boolean> {
   return true;
 }
 
-export type MomentsPage = {
-  items: MomentItem[];
-  nextCursor: string | null;
-};
+export type { MomentsPage } from "../../shared/moments.ts";
 
 export async function fetchMomentsPage(
   cursor?: string,

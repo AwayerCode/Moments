@@ -10,7 +10,9 @@
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
     "types": "wrangler types",
-    "hash-invite": "node scripts/hash-invite.mjs"
+    "hash-invite": "node scripts/hash-invite.mjs",
+    "assets:build": "node scripts/model-assets.mjs build",
+    "assets:export": "node scripts/model-assets.mjs export"
   },
   "dependencies": {
     "react": "^19.3.1",

@@ -4,25 +4,13 @@ import {
   fetchMomentsPage,
   type MomentItem,
 } from "../lib/api.ts";
+import { shouldHandleSceneShortcut } from "../lib/sceneKeyboard.ts";
 import type {
   MomentsSceneHandle,
   ScenePhase,
-} from "../three/moments/createMomentsScene.ts";
+} from "../scene/createScene.ts";
 
-const DEMO_ITEMS: MomentItem[] = [
-  { id: "m1", caption: "2025.09.15 · 1岁9个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "lilac", pin: "top" },
-  { id: "m2", caption: "2025.03.02 · 1岁3个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "mint", pin: "top" },
-  { id: "m3", caption: "2024.11.20 · 0岁11个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "sky", pin: "top" },
-  { id: "m4", caption: "2025.01.18 · 1岁1个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "peach", pin: "top" },
-  { id: "m5", caption: "2024.08.04 · 0岁8个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "mint", pin: "top" },
-  { id: "m6", caption: "2025.07.22 · 1岁7个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "sky", pin: "top" },
-  { id: "m7", caption: "2025.06.08 · 1岁6个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "peach", pin: "top" },
-  { id: "m8", caption: "2024.12.01 · 1岁0个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "lilac", pin: "top" },
-  { id: "m9", caption: "2025.04.30 · 1岁4个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "butter", pin: "top" },
-  { id: "m10", caption: "2025.10.12 · 1岁10个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "sky", pin: "top" },
-  { id: "m11", caption: "2024.09.09 · 0岁9个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "mint", pin: "top" },
-  { id: "m12", caption: "2025.02.14 · 1岁2个月", x: 0, y: 0, width: 1, height: 1, rotate: 0, palette: "mint", pin: "top" },
-];
+import { PLACEHOLDER_MOMENTS as DEMO_ITEMS } from "../../shared/demoMoments.ts";
 
 export function MomentScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,13 +18,14 @@ export function MomentScene() {
   const nextCursorRef = useRef<string | null>(null);
   const loadingMoreRef = useRef(false);
   const [phase, setPhase] = useState<ScenePhase>("loading");
-  const [inspected, setInspected] = useState<MomentItem | null>(null);
+
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelled = false;
+    const controller = new AbortController();
     let scene: MomentsSceneHandle | null = null;
 
     void (async () => {
@@ -46,13 +35,18 @@ export function MomentScene() {
         // A public preview remains available when private access is unavailable.
       }
 
-      let items = DEMO_ITEMS;
+      let items: MomentItem[] = [];
       try {
-        const page = await fetchMomentsPage();
-        if (page.items.length) items = page.items;
-        nextCursorRef.current = page.nextCursor;
-      } catch {
-        // The WebGL scene can still demonstrate its motion with local artwork.
+        let cursor: string | undefined;
+        do {
+          const page = await fetchMomentsPage(cursor);
+          items = page.items;
+          cursor = page.nextCursor ?? undefined;
+          nextCursorRef.current = page.nextCursor;
+        } while (!cancelled && !items.length && cursor);
+      } catch (error) {
+        if (error instanceof Error && error.message === "unauthorized") items = DEMO_ITEMS;
+        else if (!cancelled) setNotice("照片暂时无法加载，请刷新重试");
       }
       if (cancelled) return;
 
@@ -61,10 +55,14 @@ export function MomentScene() {
         if (!cursor || loadingMoreRef.current || !sceneRef.current) return;
         loadingMoreRef.current = true;
         try {
-          const page = await fetchMomentsPage(cursor);
-          if (cancelled) return;
-          nextCursorRef.current = page.nextCursor;
-          if (page.items.length) sceneRef.current?.appendItems(page.items);
+          let next: string | undefined = cursor;
+          do {
+            const page = await fetchMomentsPage(next);
+            if (cancelled) return;
+            nextCursorRef.current = page.nextCursor;
+            next = page.nextCursor ?? undefined;
+            if (page.items.length) { sceneRef.current?.appendItems(page.items); break; }
+          } while (next);
         } catch {
           // Keep the current wall usable when the next page is unavailable.
         } finally {
@@ -74,14 +72,14 @@ export function MomentScene() {
 
       try {
         const { createMomentsScene } = await import(
-          "../three/moments/createMomentsScene.ts"
+          "../scene/createScene.ts"
         );
         scene = await createMomentsScene(canvas, items, {
-          onPhase: setPhase,
-          onInspect: setInspected,
+          onPhase: (phase) => { if (!cancelled) setPhase(phase); },
+
           onNearEnd: () => void loadMore(),
-          onError: setNotice,
-        });
+          onError: (message) => { if (!cancelled) setNotice(message); },
+        }, controller.signal);
       } catch {
         if (!cancelled) {
           setNotice("3D 场景暂时无法打开，请检查浏览器 WebGL 支持后重试");
@@ -97,6 +95,7 @@ export function MomentScene() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       nextCursorRef.current = null;
       loadingMoreRef.current = false;
       sceneRef.current = null;
@@ -116,7 +115,8 @@ export function MomentScene() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        sceneRef.current?.closeInspect();
+        if (phase === "gallery") sceneRef.current?.returnToCamera();
+        else sceneRef.current?.closeInspect();
         return;
       }
       if (event.key === "ArrowLeft") {
@@ -129,14 +129,17 @@ export function MomentScene() {
         sceneRef.current?.travel(1);
         return;
       }
-      if (event.key === " " || event.key === "Enter") {
+      if (
+        (event.key === " " || event.key === "Enter") &&
+        shouldHandleSceneShortcut(event.target)
+      ) {
         event.preventDefault();
         sceneRef.current?.pressShutter();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [phase]);
 
   return (
     <main className="moments-scene" data-phase={phase}>
@@ -160,12 +163,11 @@ export function MomentScene() {
             type="button"
             className="shutter-control"
             onClick={() => sceneRef.current?.pressShutter()}
-            aria-label="按下快门，打印第一张照片"
+            aria-label="轻按快门，走进 Moments"
           >
             <span aria-hidden />
-            轻按快门
+            轻按快门，走进 Moments
           </button>
-          <p>第一张照片会带你走进 Moments</p>
         </div>
       ) : null}
 
@@ -173,27 +175,6 @@ export function MomentScene() {
         <div className="scene-process" role="status">
           <span />
           正在显影
-        </div>
-      ) : null}
-
-      {phase === "gallery" ? (
-        <div className="gallery-hint" aria-live="polite">
-          <button type="button" onClick={() => sceneRef.current?.travel(-1)} aria-label="向左边看">
-            ‹
-          </button>
-          <p>左右拖动看展 · 滑过左缘回到相机</p>
-          <button type="button" onClick={() => sceneRef.current?.travel(1)} aria-label="向右边看">
-            ›
-          </button>
-        </div>
-      ) : null}
-
-      {phase === "inspect" && inspected ? (
-        <div className="inspect-caption" aria-live="polite">
-          <p>{inspected.caption}</p>
-          <button type="button" onClick={() => sceneRef.current?.closeInspect()}>
-            返回展廊
-          </button>
         </div>
       ) : null}
 

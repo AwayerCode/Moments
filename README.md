@@ -10,10 +10,12 @@
 
 整个站点是一个连续的 Three.js 场景，没有首页与内页切换：
 
-1. 入口只有一台沁桃粉拍立得，落在柔和渐变背景上。没有房间、窗、台座或其它道具。
-2. 第一次按下快门后，相纸打印显影，镜头再平移到正面展墙。
-3. 展墙正对镜头。只能左右平移浏览；滑过左缘会回到相机。再次快门用短转入，不必重做长打印。
-4. 点击照片镜头推近；按 `Esc` 或「返回展廊」退出。近景时不会切回相机。
+1. 入口是 Blender 建模的儿童房，拍立得与玩具共用空间和灯光。
+2. 按快门后，相纸沿出纸口水平打印，镜头平移到同一世界里的展墙。
+3. 鼠标拖动、滚轮或方向键左右浏览；到达边界后停止，不会因滑动退出画廊。
+4. 点击照片推近，再次点击或按 `Esc` 退出近景；画廊中按 `Esc` 回到相机。
+
+房间不再使用照片背景。当前模型仍是空间原型，后续细化模型、材质与光照不需要重写交互。
 
 场景支持 `prefers-reduced-motion`；启用减少动态效果时用短淡入淡出代替长镜头。
 
@@ -25,7 +27,7 @@
 - 私有 R2：绑定名 `MOMENTS_BUCKET`，桶名 `sisi-moments`
 - 发布主机名：`*.workers.dev`
 
-Three.js 场景入口位于 `src/three/moments/createMomentsScene.ts`，React 只负责加载、键盘操作与可访问控件。
+Three.js 场景入口位于 `src/scene/createScene.ts`，React 只负责加载、键盘操作与可访问控件。
 
 ## 本地运行
 
@@ -89,7 +91,7 @@ npx wrangler secret put ACCESS_INVITE_HASH
 npx wrangler secret put SESSION_SECRET
 ```
 
-邀请链接本身也是秘密，不要发到公开群聊或提交到仓库。需要撤销时轮换令牌、更新 `ACCESS_INVITE_HASH` 并部署。
+邀请链接本身也是秘密，不要发到公开群聊或提交到仓库。轮换令牌并更新 `ACCESS_INVITE_HASH` 只能阻止旧邀请继续兑换；要撤销已签发会话，还必须轮换 `SESSION_SECRET`。
 
 ## 照片与 R2
 
@@ -120,13 +122,22 @@ GET /api/media/<object-key>
 
 画廊布局由前端按内容顺序生成，R2 元数据不需要保存 CSS 坐标。
 
-## 相机资产
+## 项目结构与模型流程
 
-- `assets/source/sisi-camera.blend`：可编辑 Blender 源文件
-- `assets/source/build_camera.py`：可重复构建脚本
-- `public/models/sisi-camera.glb`：浏览器加载模型
+- `src/components/`：React 容器、加载与可访问交互
+- `src/scene/createScene.ts`：单场景协调与动画状态
+- `src/scene/`：世界加载、灯光、渲染、镜头、照片布局及资源生命周期
+- `shared/`：前后端共用的照片类型与虚构示例数据
+- `worker/`：邀请鉴权、私有媒体与分页接口
+- `assets/source/`：Blender 源文件、建模脚本及锚点约定
+- `public/models/`：运行时 GLB
+- `assets/reference/legacy/`：旧方案参考资产，不进入站点静态资源
 
-所有相机资产为项目原创，不包含真实儿童照片、姓名、生日或可识别的第三方品牌素材。
+执行 `npm run assets:build` 会重新生成原型 `.blend` 和 `.glb`，覆盖手工修改。
+手工精修 `.blend` 后使用 `npm run assets:export`，只导出 GLB。详见
+[模型制作约定](assets/source/README.md)。两条命令都支持 `BLENDER_BIN` 指定 Blender。
+
+所有模型为项目原创，不包含真实儿童照片、姓名、生日或第三方品牌素材。
 
 ## 部署
 
